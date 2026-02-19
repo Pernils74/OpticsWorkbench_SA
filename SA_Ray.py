@@ -11,7 +11,7 @@ import Part
 import math
 import traceback
 from wavelength_to_rgb.gentable import wavelen2rgb
-import OpticalObject
+import SA_OpticalObject
 import FreeCAD
 
 translate = FreeCAD.Qt.translate
@@ -558,7 +558,7 @@ class RayWorker:
             newRefIdx = self.lastRefIdx[len(self.lastRefIdx) - 2]
 
         if len(nearest_obj.Sellmeier) == 6:
-            n = OpticalObject.refraction_index_from_sellmeier(
+            n = SA_OpticalObject.refraction_index_from_sellmeier(
                 fp.Wavelength, nearest_obj.Sellmeier
             )
         else:
@@ -592,7 +592,7 @@ class RayWorker:
             newRefIdx = self.lastRefIdx[len(self.lastRefIdx) - 2]
 
         if len(nearest_obj.Sellmeier) == 6:
-            n = OpticalObject.refraction_index_from_sellmeier(
+            n = SA_OpticalObject.refraction_index_from_sellmeier(
                 fp.Wavelength, nearest_obj.Sellmeier
             )
         else:
@@ -1252,11 +1252,11 @@ class GridToFocalBeam:
         }
 
 
-Gui.addCommand("Ray (monochrome)", Ray())
-Gui.addCommand("Ray (sun light)", RaySun())
-Gui.addCommand("Beam", Beam2D())
-Gui.addCommand("2D Radial Beam", RadialBeam2D())
-Gui.addCommand("Spherical Beam", SphericalBeam())
-Gui.addCommand("Start", RedrawAll())
-Gui.addCommand("Off", AllOff())
-Gui.addCommand("Grid Focal Beam", GridToFocalBeam())
+Gui.addCommand("SA_Ray (monochrome)", Ray())
+Gui.addCommand("SA_Ray (sun light)", RaySun())
+Gui.addCommand("SA_Beam", Beam2D())
+Gui.addCommand("SA_2D Radial Beam", RadialBeam2D())
+Gui.addCommand("SA_Spherical Beam", SphericalBeam())
+Gui.addCommand("SA_Start", RedrawAll())
+Gui.addCommand("SA_Off", AllOff())
+Gui.addCommand("SA_Grid Focal Beam", GridToFocalBeam())

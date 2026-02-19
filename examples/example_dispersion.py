@@ -3,32 +3,37 @@ import Sketcher
 import Part
 import FreeCAD as App
 import FreeCADGui as Gui
-import OpticsWorkbench
+import SA_OpticsWorkbench
 import os
 from PySide.QtCore import QT_TRANSLATE_NOOP
 
-_icondir_ = os.path.join(os.path.dirname(__file__), '..')
+_icondir_ = os.path.join(os.path.dirname(__file__), "..")
+
 
 def create_prism(doc):
-    Sketch_Prism = doc.addObject('Sketcher::SketchObject', 'Sketch_Prism')
-    add_line = lambda a,b: Sketch_Prism.addGeometry(Part.LineSegment(Vector (a), Vector(b)))
+    Sketch_Prism = doc.addObject("Sketcher::SketchObject", "Sketch_Prism")
+    add_line = lambda a, b: Sketch_Prism.addGeometry(
+        Part.LineSegment(Vector(a), Vector(b))
+    )
     a = (1.13, 0.26, 0.0)
-    b = (1.50, -.38, 0.0)
-    c = (0.76, -.38, 0.0)
+    b = (1.50, -0.38, 0.0)
+    c = (0.76, -0.38, 0.0)
     add_line(a, b)
     add_line(b, c)
     add_line(c, a)
 
-    add_constraint = lambda *args: Sketch_Prism.addConstraint(Sketcher.Constraint(*args))
-    add_constraint('Coincident', 0, 2, 1, 1)
-    add_constraint('Coincident', 1, 2, 2, 1)
-    add_constraint('Coincident', 2, 2, 0, 1)
-    add_constraint('Equal', 1, 2)
-    add_constraint('Equal', 0, 1)
+    add_constraint = lambda *args: Sketch_Prism.addConstraint(
+        Sketcher.Constraint(*args)
+    )
+    add_constraint("Coincident", 0, 2, 1, 1)
+    add_constraint("Coincident", 1, 2, 2, 1)
+    add_constraint("Coincident", 2, 2, 0, 1)
+    add_constraint("Equal", 1, 2)
+    add_constraint("Equal", 0, 1)
     Sketch_Prism.Visibility = False
 
-    prism = doc.addObject('PartDesign::Pad','prism')
-    prism.Profile= Sketch_Prism
+    prism = doc.addObject("PartDesign::Pad", "prism")
+    prism.Profile = Sketch_Prism
     prism.Midplane = 1  # symmetric
     prism.Length = 0.2
 
@@ -37,7 +42,7 @@ def create_prism(doc):
     prism.ViewObject.LineMaterial.Transparency = 30
     prism.ViewObject.PointMaterial.Transparency = 30
     return prism
-    
+
 
 def make_optics():
     App.newDocument("Dispersion Example")
@@ -45,26 +50,30 @@ def make_optics():
 
     prism = create_prism(doc)
     doc.recompute()
-    OpticsWorkbench.makeLens(prism, material='PMMA (plexiglass)').Label = 'Refractor'
-    OpticsWorkbench.makeSunRay(maxRayLength=2.0)
+    SA_OpticsWorkbench.makeLens(prism, material="PMMA (plexiglass)").Label = "Refractor"
+    SA_OpticsWorkbench.makeSunRay(maxRayLength=2.0)
     doc.recompute()
 
-class ExampleDispersion():
-    '''This class will be loaded when the workbench is activated in FreeCAD. You must restart FreeCAD to apply changes in this class'''  
-      
+
+class ExampleDispersion:
+    """This class will be loaded when the workbench is activated in FreeCAD. You must restart FreeCAD to apply changes in this class"""
+
     def Activated(self):
         make_optics()
-        Gui.activeDocument().activeView().viewTop()  
-        Gui.SendMsgToActiveView("ViewFit")          
+        Gui.activeDocument().activeView().viewTop()
+        Gui.SendMsgToActiveView("ViewFit")
 
     def IsActive(self):
-        return(True)
-        
+        return True
+
     def GetResources(self):
-        '''Return the icon which will appear in the tree view. This method is optional and if not defined a default icon is shown.'''
-        return {'Pixmap'  : os.path.join(_icondir_, 'optics_workbench_icon.svg'),
-                'Accel' : "", # a default shortcut (optional)
-                'MenuText': QT_TRANSLATE_NOOP('ExampleDispersion', 'Example - Dispersion'),
-                'ToolTip' : '' }
-                
-Gui.addCommand('ExampleDispersion', ExampleDispersion())
+        """Return the icon which will appear in the tree view. This method is optional and if not defined a default icon is shown."""
+        return {
+            "Pixmap": os.path.join(_icondir_, "optics_workbench_icon.svg"),
+            "Accel": "",  # a default shortcut (optional)
+            "MenuText": QT_TRANSLATE_NOOP("ExampleDispersion", "Example - Dispersion"),
+            "ToolTip": "",
+        }
+
+
+Gui.addCommand("ExampleDispersion", ExampleDispersion())

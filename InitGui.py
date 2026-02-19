@@ -7,31 +7,31 @@ __doc__ = "Optics Workbench workbench"
 __version__ = "0.0.1"
 
 
-class OpticsWorkbench(Workbench):
+class OpticsWorkbench_SA(Workbench):
     def __init__(self):
         import os
-        import OpticsWorkbench
+        import SA_OpticsWorkbench
         import FreeCADGui
 
         translate = FreeCAD.Qt.translate
         translations_path = os.path.join(
-            OpticsWorkbench.get_module_path(), "translations"
+            SA_OpticsWorkbench.get_module_path(), "translations"
         )
         FreeCADGui.addLanguagePath(translations_path)
         FreeCADGui.updateLocale()
 
-        self.__class__.MenuText = "Optics"
+        self.__class__.MenuText = "Optics_SA"
         self.__class__.ToolTip = translate("Workbench", "Ray Tracing Simulation")
         self.__class__.Icon = os.path.join(
-            OpticsWorkbench.get_module_path(), "optics_workbench_icon.svg"
+            SA_OpticsWorkbench.get_module_path(), "optics_workbench_icon.svg"
         )
 
     def Initialize(self):
         """This function is executed when FreeCAD starts"""
         # import here all the needed files that create your FreeCAD commands
-        import Ray
-        import OpticalObject
-        import Plot
+        import SA_Ray
+        import SA_OpticalObject
+        import SA_Plot
         from examples import (
             example1,
             example3D,
@@ -44,27 +44,27 @@ class OpticsWorkbench(Workbench):
         from PySide.QtCore import QT_TRANSLATE_NOOP
 
         rays = [
-            QT_TRANSLATE_NOOP("Workbench", "Ray (monochrome)"),
-            QT_TRANSLATE_NOOP("Workbench", "Ray (sun light)"),
-            QT_TRANSLATE_NOOP("Workbench", "Beam"),
-            QT_TRANSLATE_NOOP("Workbench", "2D Radial Beam"),
-            QT_TRANSLATE_NOOP("Workbench", "Spherical Beam"),
-            QT_TRANSLATE_NOOP("Workbench", "Grid Focal Beam"),
+            QT_TRANSLATE_NOOP("Workbench", "SA_Ray (monochrome)"),
+            QT_TRANSLATE_NOOP("Workbench", "SA_Ray (sun light)"),
+            QT_TRANSLATE_NOOP("Workbench", "SA_Beam"),
+            QT_TRANSLATE_NOOP("Workbench", "SA_2D Radial Beam"),
+            QT_TRANSLATE_NOOP("Workbench", "SA_Spherical Beam"),
+            QT_TRANSLATE_NOOP("Workbench", "SA_Grid Focal Beam"),
         ]
         optics = [
-            QT_TRANSLATE_NOOP("Workbench", "Emitter"),
-            QT_TRANSLATE_NOOP("Workbench", "Mirror"),
-            QT_TRANSLATE_NOOP("Workbench", "Grating"),
-            QT_TRANSLATE_NOOP("Workbench", "Absorber"),
-            QT_TRANSLATE_NOOP("Workbench", "Lens"),
+            QT_TRANSLATE_NOOP("Workbench", "SA_Emitter"),
+            QT_TRANSLATE_NOOP("Workbench", "SA_Mirror"),
+            QT_TRANSLATE_NOOP("Workbench", "SA_Grating"),
+            QT_TRANSLATE_NOOP("Workbench", "SA_Absorber"),
+            QT_TRANSLATE_NOOP("Workbench", "SA_Lens"),
         ]
         actions = [
-            QT_TRANSLATE_NOOP("Workbench", "Off"),
-            QT_TRANSLATE_NOOP("Workbench", "Start"),
+            QT_TRANSLATE_NOOP("Workbench", "SA_Off"),
+            QT_TRANSLATE_NOOP("Workbench", "SA_Start"),
         ]
         analysis = [
-            QT_TRANSLATE_NOOP("Workbench", "RayHits"),
-            QT_TRANSLATE_NOOP("Workbench", "Hits2CSV"),
+            QT_TRANSLATE_NOOP("Workbench", "SA_RayHits"),
+            QT_TRANSLATE_NOOP("Workbench", "SA_Hits2CSV"),
         ]
         separator = ["Separator"]
         examples = [
@@ -106,4 +106,4 @@ class OpticsWorkbench(Workbench):
         return "Gui::PythonWorkbench"
 
 
-Gui.addWorkbench(OpticsWorkbench())
+Gui.addWorkbench(OpticsWorkbench_SA())

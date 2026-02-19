@@ -691,8 +691,8 @@ class OpticalEmitter:
         }
 
 
-Gui.addCommand("Emitter", OpticalEmitter())
-Gui.addCommand("Mirror", OpticalMirror())
-Gui.addCommand("Absorber", OpticalAbsorber())
-Gui.addCommand("Lens", OpticalLens())
-Gui.addCommand("Grating", OpticalGrating())
+Gui.addCommand("SA_Emitter", OpticalEmitter())
+Gui.addCommand("SA_Mirror", OpticalMirror())
+Gui.addCommand("SA_Absorber", OpticalAbsorber())
+Gui.addCommand("SA_Lens", OpticalLens())
+Gui.addCommand("SA_Grating", OpticalGrating())
