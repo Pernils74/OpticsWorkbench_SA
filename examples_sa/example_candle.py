@@ -132,4 +132,4 @@ class ExampleCandle:
         }
 
 
-Gui.addCommand("ExampleCandle", ExampleCandle())
+Gui.addCommand("sa_ExampleCandle", ExampleCandle())

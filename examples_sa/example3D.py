@@ -67,12 +67,12 @@ def make_Test3D():
 
     doc.recompute()
 
-    sa_OpticsWorkbench.makeMirror([Cube, Sphere, Cone], True)
-    sa_OpticsWorkbench.makeAbsorber([Cylinder])
-    sa_OpticsWorkbench.makeLens([HalfSphere])
+    sa_OpticsWorkbench.makeMirror([Cube, Sphersa_e, Cone], True)
+    sa_OpticsWorkbench.makeAbsorsa_ber([Cylinder])
+    sa_OpticsWorkbench.makeLensa_s([HalfSphere])
 
     doc.recompute()
-    sa_OpticsWorkbench.makeRay(beamNrColumns=20, beamNrRows=10, beamDistance=0.05)
+    sa_OpticsWorkbench.makeRay(beamNrColumns=20, beamNrRows=10, beasa_mDistance=0.05)
 
     doc.recompute()
 
@@ -98,4 +98,4 @@ class Example3D:
         }
 
 
-Gui.addCommand("Example3D", Example3D())
+Gui.addCommand("sa_Example3D", Example3D())

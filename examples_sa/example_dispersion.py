@@ -76,4 +76,4 @@ class ExampleDispersion:
         }
 
 
-Gui.addCommand("ExampleDispersion", ExampleDispersion())
+Gui.addCommand("sa_ExampleDispersion", ExampleDispersion())

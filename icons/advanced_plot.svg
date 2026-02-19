@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Spreadsheet (färre & starkare rutor) + plot overlay (tonade punkter). Axlar från nedre-vänster. -->
+<svg
+  width="64" height="64" viewBox="0 0 64 64" version="1.1"
+  xmlns="http://www.w3.org/2000/svg">
+
+  <!-- ====== DEFS ====== -->
+  <defs>
+    <!-- Ljus bakgrund med lite högre opacity -->
+    <linearGradient id="sheetGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" style="stop-color:#f4f5f3;stop-opacity:0.95"/>
+      <stop offset="1" style="stop-color:#d6d8d3;stop-opacity:0.95"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ====== BACKGROUND: Spreadsheet ====== -->
+  <g id="sheet_bg" opacity="0.92">
+    <!-- Ark -->
+    <rect x="4" y="4" width="56" height="56" rx="4"
+          style="fill:url(#sheetGrad);stroke:#1a1a1a;stroke-width:2;stroke-opacity:0.45"/>
+
+    <!-- FÄRRE men TYDLIGARE rutor: 4x4 -->
+    <g stroke="#8f9690" stroke-width="2" stroke-opacity="0.85">
+      <!-- Vertikala 4 st -->
+      <line x1="20" y1="4" x2="20" y2="60"/>
+      <line x1="36" y1="4" x2="36" y2="60"/>
+      <line x1="52" y1="4" x2="52" y2="60"/>
+
+      <!-- Horisontella 4 st -->
+      <line x1="4" y1="20" x2="60" y2="20"/>
+      <line x1="4" y1="36" x2="60" y2="36"/>
+      <line x1="4" y1="52" x2="60" y2="52"/>
+    </g>
+  </g>
+
+  <!-- ====== OVERLAY: Plot (axlar + punkter) ====== -->
+  <g id="plot_overlay">
+
+    <!-- Axlar + diagonal – originalkänsla -->
+    <g transform="matrix(0.92857143,0,0,0.92857143,2.24,2.37)">
+      <!-- highlight -->
+      <path d="M 4,4 V 60 H 60"
+            style="fill:none;stroke:#eeeeec;stroke-width:8.6;stroke-linecap:round;stroke-linejoin:round;stroke-opacity:1"/>
+      <path d="M 4.05,59.9 35.61,28.39"
+            style="fill:none;stroke:#eeeeec;stroke-width:8.6;stroke-linecap:round;stroke-linejoin:round;stroke-opacity:1"/>
+
+      <!-- foreground outline -->
+      <path d="M 4,4 V 60 H 60"
+            style="fill:none;stroke:#1a1a1a;stroke-width:4.3;stroke-linecap:round;stroke-linejoin:round;stroke-opacity:1"/>
+      <path d="M 4.05,59.9 35.61,28.39"
+            style="fill:none;stroke:#1a1a1a;stroke-width:4.3;stroke-linecap:round;stroke-linejoin:round;stroke-opacity:1"/>
+    </g>
+
+    <!-- TONADE PUNKTER – lite mindre, soft -->
+    <circle cx="39.65" cy="45.98" r="5.2"
+            style="fill:#ef2929;fill-opacity:0.60;
+                   stroke:#0b1523;stroke-width:1.6;stroke-opacity:0.45"/>
+
+    <circle cx="52.75" cy="15.25" r="5.2"
+            style="fill:#729fcf;fill-opacity:0.60;
+                   stroke:#0b1523;stroke-width:1.6;stroke-opacity:0.45"/>
+
+    <circle cx="24.95" cy="19.08" r="5.2"
+            style="fill:#8ae234;fill-opacity:0.60;
+                   stroke:#0b1523;stroke-width:1.6;stroke-opacity:0.45"/>
+
+  </g>
+
+</svg>

@@ -142,4 +142,4 @@ class ExampleSemi:
         }
 
 
-Gui.addCommand("ExampleSemi", ExampleSemi())
+Gui.addCommand("sa_ExampleSemi", ExampleSemi())

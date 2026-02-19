@@ -1,15 +1,18 @@
 # -*- coding: utf-8 -*-
 
-from PySide.QtCore import QT_TRANSLATE_NOOP
+# sa_OpticalObject.py
 
-__title__ = "OpticalObject"
-__author__ = "Christian Bergmann"
-__license__ = "LGPL 3.0"
-__doc__ = "Declare your FreeCAD objects to be optical mirrors, lenses or absorbers"
+# from PySide2.QtCore import translate
+
+
+# __title__ = 'OpticalObject'
+# __author__ = 'Christian Bergmann'
+# __license__ = 'LGPL 3.0'
+# __doc__ = 'Declare your FreeCAD objects to be optical mirrors, lenses or absorbers'
 
 import os
-import FreeCADGui as Gui
 import FreeCAD
+import FreeCADGui as Gui
 import math
 
 translate = FreeCAD.Qt.translate
@@ -519,7 +522,7 @@ class OpticalMirror:
 
     def Activated(self):
         selection = Gui.Selection.getSelectionEx()
-        Gui.doCommand("import OpticsWorkbench")
+        Gui.doCommand("import sa_OpticsWorkbench")
         Gui.doCommand("objects = []")
         for sel in selection:
             Gui.doCommand(
@@ -527,7 +530,7 @@ class OpticalMirror:
                 % (sel.ObjectName)
             )
 
-        Gui.doCommand("OpticsWorkbench.makeMirror(objects)")
+        Gui.doCommand("sa_OpticsWorkbench.makeMirror(objects)")
 
     def IsActive(self):
         """Here you can define if the command must be active or not (greyed) if certain conditions
@@ -542,8 +545,8 @@ class OpticalMirror:
         return {
             "Pixmap": os.path.join(_icondir_, "mirror.svg"),
             "Accel": "",  # a default shortcut (optional)
-            "MenuText": QT_TRANSLATE_NOOP("Mirror", "Optical Mirror"),
-            "ToolTip": QT_TRANSLATE_NOOP(
+            "MenuText": translate("Mirror", "Optical Mirror"),
+            "ToolTip": translate(
                 "Mirror", "Declare your FreeCAD objects to be optical mirrors"
             ),
         }
@@ -554,7 +557,7 @@ class OpticalAbsorber:
 
     def Activated(self):
         selection = Gui.Selection.getSelectionEx()
-        Gui.doCommand("import OpticsWorkbench")
+        Gui.doCommand("import sa_OpticsWorkbench")
         Gui.doCommand("objects = []")
         for sel in selection:
             Gui.doCommand(
@@ -562,7 +565,7 @@ class OpticalAbsorber:
                 % (sel.ObjectName)
             )
 
-        Gui.doCommand("OpticsWorkbench.makeAbsorber(objects)")
+        Gui.doCommand("sa_OpticsWorkbench.makeAbsorber(objects)")
 
     def IsActive(self):
         """Here you can define if the command must be active or not (greyed) if certain conditions
@@ -577,8 +580,8 @@ class OpticalAbsorber:
         return {
             "Pixmap": os.path.join(_icondir_, "absorber.svg"),
             "Accel": "",  # a default shortcut (optional)
-            "MenuText": QT_TRANSLATE_NOOP("Absorber", "Optical Absorber"),
-            "ToolTip": QT_TRANSLATE_NOOP(
+            "MenuText": translate("Absorber", "Optical Absorber"),
+            "ToolTip": translate(
                 "Absorber", "Declare your FreeCAD objects to be optical absorbers"
             ),
         }
@@ -589,7 +592,7 @@ class OpticalLens:
 
     def Activated(self):
         selection = Gui.Selection.getSelectionEx()
-        Gui.doCommand("import OpticsWorkbench")
+        Gui.doCommand("import sa_OpticsWorkbench")
         Gui.doCommand("objects = []")
         for sel in selection:
             Gui.doCommand(
@@ -597,7 +600,7 @@ class OpticalLens:
                 % (sel.ObjectName)
             )
 
-        Gui.doCommand('OpticsWorkbench.makeLens(objects, material="Quartz")')
+        Gui.doCommand('sa_OpticsWorkbench.makeLens(objects, material="Quartz")')
 
     def IsActive(self):
         """Here you can define if the command must be active or not (greyed) if certain conditions
@@ -612,8 +615,8 @@ class OpticalLens:
         return {
             "Pixmap": os.path.join(_icondir_, "lens.svg"),
             "Accel": "",  # a default shortcut (optional)
-            "MenuText": QT_TRANSLATE_NOOP("Lens", "Optical Lens"),
-            "ToolTip": QT_TRANSLATE_NOOP(
+            "MenuText": translate("Lens", "Optical Lens"),
+            "ToolTip": translate(
                 "Lens", "Declare your FreeCAD objects to be optical lenses"
             ),
         }
@@ -624,7 +627,7 @@ class OpticalGrating:
 
     def Activated(self):
         selection = Gui.Selection.getSelectionEx()
-        Gui.doCommand("import OpticsWorkbench")
+        Gui.doCommand("import sa_OpticsWorkbench")
         Gui.doCommand("objects = []")
         for sel in selection:
             Gui.doCommand(
@@ -632,7 +635,7 @@ class OpticalGrating:
                 % (sel.ObjectName)
             )
 
-        Gui.doCommand("OpticsWorkbench.makeGrating(objects)")
+        Gui.doCommand("sa_OpticsWorkbench.makeGrating(objects)")
 
     def IsActive(self):
         """Here you can define if the command must be active or not (greyed) if certain conditions
@@ -647,8 +650,8 @@ class OpticalGrating:
         return {
             "Pixmap": os.path.join(_icondir_, "grating.svg"),
             "Accel": "",  # a default shortcut (optional)
-            "MenuText": QT_TRANSLATE_NOOP("Grating", "Diffraction grating"),
-            "ToolTip": QT_TRANSLATE_NOOP(
+            "MenuText": translate("Grating", "Diffraction grating"),
+            "ToolTip": translate(
                 "Grating", "Declare your FreeCAD objects to be diffraction gratings"
             ),
         }
@@ -659,7 +662,7 @@ class OpticalEmitter:
 
     def Activated(self):
         selection = Gui.Selection.getSelectionEx()
-        Gui.doCommand("import OpticsWorkbench")
+        Gui.doCommand("import sa_OpticsWorkbench")
         if len(selection) > 0:
             Gui.doCommand(
                 'obj = FreeCAD.ActiveDocument.getObject("%s")'
@@ -669,7 +672,7 @@ class OpticalEmitter:
             for sub in selection[0].SubElementNames:
                 faces.append(sub)
 
-            Gui.doCommand("OpticsWorkbench.makeRay(baseShape=[obj, %s])" % faces)
+            Gui.doCommand("sa_OpticsWorkbench.makeRay(baseShape=[obj, %s])" % faces)
 
     def IsActive(self):
         """Here you can define if the command must be active or not (greyed) if certain conditions
@@ -684,8 +687,8 @@ class OpticalEmitter:
         return {
             "Pixmap": os.path.join(_icondir_, "emitter.svg"),
             "Accel": "",  # a default shortcut (optional)
-            "MenuText": QT_TRANSLATE_NOOP("Emitter", "Optical Emitter"),
-            "ToolTip": QT_TRANSLATE_NOOP(
+            "MenuText": translate("Emitter", "Optical Emitter"),
+            "ToolTip": translate(
                 "Emitter", "Declare your FreeCAD objects to be optical emitters"
             ),
         }

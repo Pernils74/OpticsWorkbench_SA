@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+# sa_Ray.py
 __title__ = "Ray"
 __author__ = "Christian Bergmann"
 __license__ = "LGPL 3.0"
@@ -12,20 +12,45 @@ import math
 import traceback
 from wavelength_to_rgb.gentable import wavelen2rgb
 import sa_OpticalObject
+
 import FreeCAD
 
 translate = FreeCAD.Qt.translate
 
 
-def QT_TRANSLATE_NOOP(context, text):
-    return text
+# def translate(context, text):
+#     return text
 
 
 _icondir_ = os.path.join(os.path.dirname(__file__), "icons")
-__doc__ = QT_TRANSLATE_NOOP("Ray (monochrome)", "A single ray for raytracing")
+__doc__ = translate("Ray (monochrome)", "A single ray for raytracing")
 
 INFINITY = 1677216
 EPSILON = 1 / INFINITY
+
+
+class RayState:
+    def __init__(self, ray_id, bounce_count=0, last_hit="", prev_hit=None):
+        self.ray_id = ray_id
+        self.bounce_count = bounce_count
+        # The last surface the ray hit, formatted as "Object|Base|FaceN"
+        self.last_hit = last_hit
+        # The surface hit *before* last_hit (None for the first hit)
+        self.prev_hit = prev_hit
+
+    def bounced(self, optical_obj, base_obj, face_index):
+        new_hit = "{}|{}|Face{}".format(
+            optical_obj.Name,
+            getattr(base_obj, "Name", str(base_obj)),
+            face_index,
+        )
+
+        return RayState(
+            self.ray_id,
+            self.bounce_count + 1,
+            prev_hit=self.last_hit,  # store the previous hit
+            last_hit=new_hit,  # update with the new surface hit
+        )
 
 
 class RayWorker:
@@ -127,8 +152,19 @@ class RayWorker:
             fp.RayBundleType = rayBundleType
 
         fp.Proxy = self
+
+        self._init_runtime_state()
+
+    def _init_runtime_state(self):
+        # Runtime-only state (not stored in document)
         self.lastRefIdx = []
         self.iter = 0
+        self.ray_counter = 0
+        self.stats_buffer = (
+            {}
+        )  # buffer for statistics collection, keyed by ray_id, to avoid per-hit property appends
+
+        # self.last_hit_per_ray = {}  # ray_id -> (obj, part, point, energy, bounce)
 
     def addNewProperties(self, fp):
         # backwards compatiblity
@@ -161,6 +197,7 @@ class RayWorker:
 
     def onDocumentRestored(self, fp):
         self.addNewProperties(fp)
+        self._init_runtime_state()
 
     def execute(self, fp):
         """Do something when doing a recomputation, this method is mandatory"""
@@ -174,6 +211,12 @@ class RayWorker:
         hitname = "HitsFrom" + fp.Label
         hitcoordsname = "HitCoordsFrom" + fp.Label
         energyname = "EnergyFrom" + fp.Label
+        bouncename = "BounceCountFrom" + fp.Label
+        rayId = "RayIdFrom" + fp.Label
+        previoushitname = "PreviousHitFrom" + fp.Label
+
+        self.ray_counter = 0
+
         for optobj in activeDocument().Objects:
             if hasattr(optobj, hitname):
                 setattr(optobj, hitname, 0)
@@ -181,6 +224,12 @@ class RayWorker:
                 setattr(optobj, hitcoordsname, [])
             if hasattr(optobj, energyname):
                 setattr(optobj, energyname, [])
+            if hasattr(optobj, bouncename):
+                setattr(optobj, bouncename, [])
+            if hasattr(optobj, rayId):
+                setattr(optobj, rayId, [])
+            if hasattr(optobj, previoushitname):
+                setattr(optobj, previoushitname, [])
 
         try:  # check if the beam has the parameter coneAngle, this is a legacy check.
             coneAngle = float(fp.ConeAngle)
@@ -286,7 +335,10 @@ class RayWorker:
                             pos = pl.Rotation.multVec(
                                 Vector(0, fp.BeamDistance * n, fp.BeamDistance * row)
                             )
-                            dir = Vector(1, 0, 0)
+                            # Changed intial vector to be in z direction, so that the rotation of the ray object is more intuitive, especially for the cone ray bundle type. The old code created the initial vector in x direction and then rotated it to the correct position, which caused some confusion when using the cone ray bundle type with a non-zero cone angle, because the rays were not rotating around the z axis as expected. With the new code, the initial vector is in z direction and then rotated to the correct position, which makes it easier to understand and use the cone ray bundle type with different cone angles.
+
+                            dir = Vector(0, 0, 1)
+                            # dir = Vector(1, 0, 0)
                         else:
                             r = Rotation()
                             r.Axis = Vector(0, 0, 1)
@@ -380,6 +432,34 @@ class RayWorker:
 
         return posdirarray
 
+    def get_subelement_name(self, nearest_obj, subshape):
+        """
+        Returnera t.ex. 'Face7' / 'Edge3' / 'Vertex1' för subshape som tillhör nearest_obj.Shape
+        """
+        shp = nearest_obj.Shape
+        # Testa faces först
+        for i, f in enumerate(shp.Faces, start=1):
+            try:
+                if f.isSame(subshape):
+                    return f"Face{i}"
+            except Exception:
+                pass
+        # Kant/edge?
+        for i, e in enumerate(shp.Edges, start=1):
+            try:
+                if e.isSame(subshape):
+                    return f"Edge{i}"
+            except Exception:
+                pass
+        # Vertex?
+        for i, v in enumerate(shp.Vertexes, start=1):
+            try:
+                if v.isSame(subshape):
+                    return f"Vertex{i}"
+            except Exception:
+                pass
+        return None
+
     def makeInitialRay(self, fp, posdirarray):
         # initialize ray in global coordinate
         pl = fp.getGlobalPlacement()
@@ -396,7 +476,15 @@ class RayWorker:
                 self.lastRefIdx = []
 
                 try:
-                    tracedLines = self.traceRay(fp, (firstLine, 100))
+                    # tracedLines = self.traceRay(fp, (firstLine, 100))
+                    self.ray_counter += 1
+                    ray_id = self.ray_counter
+
+                    state = RayState(
+                        ray_id
+                    )  # Initiera state med ray_id =0  och bounce_count=0
+                    tracedLines = self.traceRay(fp, firstLine, 100, state)
+                    # tracedLines = self.traceRay(fp, (firstLine, 100, 0, ray_id))
 
                     if fp.HideFirstPart:
                         # Remove/hide first line.
@@ -427,7 +515,10 @@ class RayWorker:
                     obj_boundbox = obj.Shape.BoundBox
                     if obj_boundbox.isValid() and obj_boundbox.intersect(origin, dir):
                         if len(obj.Shape.Solids) == 0 and len(obj.Shape.Shells) == 0:
-                            for edge in obj.Shape.Edges:
+                            # for be able to collect last hitted face
+                            # for edge in obj.Shape.Edges:
+                            for i, edge in enumerate(obj.Shape.Edges, start=1):
+
                                 # get a normal to the plane where the edge is lying in
                                 if len(edge.Vertexes) == 2:
                                     edgedir = PointVec(edge.Vertexes[1]) - PointVec(
@@ -462,9 +553,16 @@ class RayWorker:
                                                 edge.transformShape(
                                                     optobj_placement_matrix
                                                 )
-                                                isec_parts.append((edge, p2))
+                                                # isec_parts.append((edge, p2))
+                                                # For be able to get the last hitted face id
+                                                # isec_parts.append(
+                                                #     (edge, p2, obj, f"Edge{i}")
+                                                # )
+                                                isec_parts.append((edge, p2, obj))
 
-                        for face in obj.Shape.Faces:
+                        # for face in obj.Shape.Faces:
+                        for i, face in enumerate(obj.Shape.Faces, start=1):
+
                             if face.BoundBox.intersect(origin, dir):
                                 isec = optobj_line.Curve.intersect(face.Surface)
                                 if isec:
@@ -483,68 +581,152 @@ class RayWorker:
                                         ):
                                             # transform face and ray back to global coordinate
                                             p.transform(optobj_placement_matrix)
-                                            face.transformShape(optobj_placement_matrix)
-                                            isec_parts.append((face, PointVec(p)))
+                                            # face.transformShape(optobj_placement_matrix)
+                                            # face = face.transformed(
+                                            #     optobj_placement_matrix
+                                            # )
+
+                                            # For be able to get the last hitted face id
+                                            # isec_parts.append((face, PointVec(p)))
+                                            # isec_parts.append(
+                                            #     (face, PointVec(p), obj, f"Face{i}")
+                                            # )
+                                            # isec_parts.append((face, PointVec(p), obj))
+                                            face_global = face.transformed(
+                                                optobj_placement_matrix
+                                            )
+                                            isec_parts.append(
+                                                (face_global, PointVec(p), obj, i)
+                                            )
 
                 if len(isec_parts) > 0:
                     isec_struct.append((optobj, isec_parts))
 
         return isec_struct
 
-    def collectStatistics(self, fp, nearest_obj, neworigin, energy):
-        hitname = "HitsFrom" + fp.Label
-        if not hasattr(nearest_obj, hitname):
-            nearest_obj.addProperty(
-                "App::PropertyQuantity",
-                hitname,
-                "OpticalObject",
-                translate("Ray", "Counts the hits from")
-                + " "
-                + fp.Label
-                + " ("
-                + translate("Ray", "read only")
-                + ")",
-            )
-            setattr(nearest_obj, hitname, 1)
-        else:
-            setattr(nearest_obj, hitname, getattr(nearest_obj, hitname) + 1)
+    def _append_property(self, obj, name, value, ptype, group, doc):
+        """
+        Robust helper for writing values to FreeCAD properties.
 
-        # print("A RAY coming from", fp.Label, "hits the receiver at", tuple(neworigin))
-        hitcoordsname = "HitCoordsFrom" + fp.Label
-        if not hasattr(nearest_obj, hitcoordsname):
-            nearest_obj.addProperty(
+        Behavior:
+        - If the property does not exist, it is created using the specified ptype.
+          * List-type properties are initialized to an empty list.
+          * Single-value properties are left unset until the assignment below.
+
+        - If the property exists:
+          * If it is a list-type property, the value is appended.
+          * If it is a single-value property, the value overwrites the existing one.
+        """
+
+        # Create property if missing
+        if not hasattr(obj, name):
+            obj.addProperty(ptype, name, group, doc)
+            # Initialize list-type properties to an empty list
+            if ptype in (
+                "App::PropertyStringList",
+                "App::PropertyIntegerList",
+                "App::PropertyFloatList",
                 "App::PropertyVectorList",
-                hitcoordsname,
-                "OpticalObject",
-                translate("Ray", "Hit coordinates from")
-                + " "
-                + fp.Label
-                + " ("
-                + translate("Ray", "read only")
-                + ")",
-            )
-            setattr(nearest_obj, hitcoordsname, [])
-        setattr(
+                "App::PropertyLinkList",
+            ):
+                setattr(obj, name, [])
+            # Non-list types are assigned directly below
+
+        current = getattr(obj, name)
+
+        # List property → append value
+        if isinstance(current, list):
+            new_list = current + [value]
+            setattr(obj, name, new_list)
+        else:
+            # Single-value property → overwrite
+            setattr(obj, name, value)
+
+    def collectStatistics(
+        self,
+        fp,
+        nearest_obj,
+        neworigin,
+        energy,
+        state,
+    ):
+
+        label = fp.Label
+
+        # --- Hit counter: HitsFrom<RayLabel> ---
+        hitsfromname = "HitsFrom" + label
+
+        # Fetch previous hit-count and increment by 1 (robust to missing or invalid values)
+        try:
+            current_hits = int(getattr(nearest_obj, hitsfromname)) + 1
+        except Exception:
+            current_hits = 1
+
+        self._append_property(
             nearest_obj,
-            hitcoordsname,
-            getattr(nearest_obj, hitcoordsname) + [neworigin],
+            hitsfromname,
+            current_hits,
+            "App::PropertyQuantity",
+            "OpticalObject",
+            "[Ray] Number of hits from this ray",
         )
 
-        energyname = "EnergyFrom" + fp.Label
-        if not hasattr(nearest_obj, energyname):
-            nearest_obj.addProperty(
-                "App::PropertyFloatList",
-                energyname,
-                "OpticalObject",
-                translate("Ray", "Energy from")
-                + " "
-                + fp.Label
-                + " ("
-                + translate("Ray", "read only")
-                + ")",
-            )
-            setattr(nearest_obj, energyname, [])
-        setattr(nearest_obj, energyname, getattr(nearest_obj, energyname) + [energy])
+        # Names of data-collection properties
+        hitcoordsname = "HitCoordsFrom" + label
+        energyname = "EnergyFrom" + label
+        bouncecountname = "BounceCountFrom" + label
+        rayidname = "RayIdFrom" + label
+        previoushitname = "PreviousHitFrom" + label
+
+        # Record hit position
+        self._append_property(
+            nearest_obj,
+            hitcoordsname,
+            neworigin,
+            "App::PropertyVectorList",
+            "OpticalObject",
+            "Hit coordinates from rays",
+        )
+
+        # Record energy at hit
+        self._append_property(
+            nearest_obj,
+            energyname,
+            float(energy),
+            "App::PropertyFloatList",
+            "OpticalObject",
+            "Energy carried by the ray at impact",
+        )
+
+        # Record bounce count
+        self._append_property(
+            nearest_obj,
+            bouncecountname,
+            int(state.bounce_count),
+            "App::PropertyIntegerList",
+            "OpticalObject",
+            "Number of bounces before this hit",
+        )
+
+        # Record ray ID
+        self._append_property(
+            nearest_obj,
+            rayidname,
+            int(state.ray_id),
+            "App::PropertyIntegerList",
+            "OpticalObject",
+            "Ray ID",
+        )
+
+        # Record the previous surface that the ray hit
+        self._append_property(
+            nearest_obj,
+            previoushitname,
+            str(state.prev_hit) if state.prev_hit else "",
+            "App::PropertyStringList",
+            "OpticalObject",
+            "Surface last hit before this impact (Object|Base|FaceN)",
+        )
 
     def traceLens(self, fp, nearest_obj, ray1, normal, isec_struct, origin):
         if len(self.lastRefIdx) == 0:
@@ -683,20 +865,31 @@ class RayWorker:
 
         return (g, False)
 
-    def traceRay(self, fp, lineAndEnergy):
+    def counts_as_bounce(self, nearest_obj):
+        # Default: bara speglar räknas. Utöka gärna med en flagga på objektet.
+        return getattr(nearest_obj, "OpticalType", "") == "mirror"
+
+    def traceRay(self, fp, line, energy, state):
         nearest = Vector(INFINITY, INFINITY, INFINITY)
         nearest_parts = []
-        line = lineAndEnergy[0]
-        energy = lineAndEnergy[1]
-
-        isec_struct = self.getIntersections(fp, line)
         origin = PointVec(line.Vertexes[0])
 
+        # Intersections along the current segment
+        isec_struct = self.getIntersections(fp, line)
         for isec in isec_struct:
             for ipoints in isec[1]:
-                dist = ipoints[1] - origin
+                if len(ipoints) < 4:
+                    continue
+
+                face_global = ipoints[0]
+                point_global = ipoints[1]
+                base_obj = ipoints[2]
+                face_index = ipoints[3]
+
+                dist = point_global - origin
                 if dist.Length <= nearest.Length + EPSILON:
-                    np = (ipoints[1], ipoints[0], isec[0])
+                    np = (point_global, face_global, isec[0], base_obj, face_index)
+
                     if abs(dist.Length - nearest.Length) < EPSILON:
                         if isec[0].OpticalType == "absorber":
                             nearest_parts = [np]
@@ -710,90 +903,86 @@ class RayWorker:
 
                     nearest = dist
 
+        # No hit → return current line
         if len(nearest_parts) == 0:
             return [line]
 
-        dNewRays = []  # Collects all new ray directions
-        for np in nearest_parts:
-            (neworigin, nearest_part, nearest_obj) = np
-            shortline = Part.makeLine(origin, neworigin)
+        # Keep the single nearest hit
+        if len(nearest_parts) > 1:
+            nearest_parts = [nearest_parts[0]]
 
-            if isRelevantOptic(fp, nearest_obj) and nearest_obj.collectStatistics:
-                self.collectStatistics(fp, nearest_obj, neworigin, energy)
+        # Unpack nearest hit
+        neworigin, nearest_part, nearest_obj, nearest_base, face_index = nearest_parts[
+            0
+        ]
 
-            # if fp.HideFirstPart == False or first == False:
-            # When it is the first part that shall be hidden, linearray[-1]
-            # was already removed at this point
-            # linearray[-1] = shortline
+        # Segment at the hit point
+        shortline = Part.makeLine(origin, neworigin)
+        ret = [shortline]
 
-            # The current line ends at the surface of the current optical
-            # element.
-            ret = [shortline]
+        # Advance ray state
+        new_state = state.bounced(nearest_obj, nearest_base, face_index)
 
-            self.iter -= 1
-            if self.iter == 0:
-                return ret
+        # Log hit immediately
+        if isRelevantOptic(fp, nearest_obj) and getattr(
+            nearest_obj, "collectStatistics", False
+        ):
+            self.collectStatistics(fp, nearest_obj, neworigin, energy, new_state)
 
-            # Compute a new ray that follows --depending on the current optical
-            # element-- reflection, refraction or diffraction.
-            dRay = neworigin - origin
-            ray1 = dRay / dRay.Length
+        # Stop condition after logging
+        self.iter -= 1
+        if self.iter == 0:
+            return ret
 
-            if hasattr(nearest_obj, "Transparency"):
-                P_pass = energy * (nearest_obj.Transparency) / 100
-                P_reflect = energy * (100 - nearest_obj.Transparency) / 100
-            else:
-                P_pass = energy
-                P_reflect = 0
+        # Compute outgoing rays
+        dRay = neworigin - origin
+        ray1 = dRay / dRay.Length
 
-            normal = self.getNormal(nearest_obj, nearest_part, origin, neworigin)
-            if normal.Length == 0:
-                print("Cannot determine the normal on " + nearest_obj.Label)
-                return ret
+        if hasattr(nearest_obj, "Transparency"):
+            P_pass = energy * (nearest_obj.Transparency) / 100.0
+            P_reflect = energy * (100 - nearest_obj.Transparency) / 100.0
+        else:
+            P_pass, P_reflect = energy, 0
 
-            if nearest_obj.OpticalType == "mirror":
-                if nearest_obj.Transparency < 100:
-                    dNewRays.append((self.mirror(dRay, normal), P_reflect))
+        normal = self.getNormal(nearest_obj, nearest_part, origin, neworigin)
+        if normal.Length == 0:
+            return ret
 
-            if (
-                nearest_obj.OpticalType == "mirror"
-                or nearest_obj.OpticalType == "absorber"
-            ):
-                if nearest_obj.Transparency > 0:
-                    if self.isInsideSolid(origin, nearest_obj):
-                        P_pass = energy
+        dNewRays = []  # (direction_vec, energy_next, counts_as_bounce)
 
-                    dNewRays.append((-dRay, P_pass))
-
-            elif nearest_obj.OpticalType == "lens":
-                (newray, totalReflection) = self.traceLens(
-                    fp, nearest_obj, ray1, normal, isec_struct, origin
-                )
-                if self.isInsideLens(isec_struct, origin, nearest_obj):
+        if nearest_obj.OpticalType == "mirror":
+            if nearest_obj.Transparency < 100:
+                dNewRays.append((self.mirror(dRay, normal), P_reflect, True))
+            if nearest_obj.Transparency > 0:
+                if self.isInsideSolid(origin, nearest_obj):
                     P_pass = energy
-                elif nearest_obj.Transparency < 100 and not totalReflection:
-                    dNewRays.append((self.mirror(dRay, normal), P_reflect))
+                dNewRays.append((-dRay, P_pass, False))
 
-                dNewRays.append((newray, P_pass))
-
-            elif nearest_obj.OpticalType == "grating":
-                (newray, totalReflection) = self.traceGrating(
-                    fp, nearest_obj, ray1, normal, isec_struct, origin
-                )
-                dNewRays.append((newray, P_pass))
-
-            else:
-                return ret
-
-        newlines = []
-        for dNewRay in dNewRays:
-            nl = Part.makeLine(
-                neworigin, neworigin - dNewRay[0] * fp.MaxRayLength / dNewRay[0].Length
+        elif nearest_obj.OpticalType == "lens":
+            (newray, totalReflection) = self.traceLens(
+                fp, nearest_obj, ray1, normal, isec_struct, origin
             )
-            newlines.append((nl, dNewRay[1]))
+            if self.isInsideLens(isec_struct, origin, nearest_obj):
+                P_pass = energy
+            elif nearest_obj.Transparency < 100 and not totalReflection:
+                dNewRays.append((self.mirror(dRay, normal), P_reflect, True))
+            dNewRays.append((newray, P_pass, False))
 
-        for line in newlines:
-            ret.extend(self.traceRay(fp, line))
+        elif nearest_obj.OpticalType == "grating":
+            (newray, totalReflection) = self.traceGrating(
+                fp, nearest_obj, ray1, normal, isec_struct, origin
+            )
+            dNewRays.append((newray, P_pass, False))
+
+        else:
+            return ret
+
+        # Recurse
+        for dvec, energy_next, _ in dNewRays:
+            nl = Part.makeLine(
+                neworigin, neworigin - dvec * fp.MaxRayLength / dvec.Length
+            )
+            ret.extend(self.traceRay(fp, nl, energy_next, new_state))
 
         return ret
 
@@ -947,11 +1136,22 @@ def PointVec(point):
     return Vector(point.X, point.Y, point.Z)
 
 
+# def isOpticalObject(obj):
+#     return (
+#         obj.TypeId == "Part::FeaturePython"
+#         and hasattr(obj, "OpticalType")
+#         and hasattr(obj, "Base")
+#     )
+
+
 def isOpticalObject(obj):
     return (
-        obj.TypeId == "Part::FeaturePython"
-        and hasattr(obj, "OpticalType")
+        hasattr(obj, "OpticalType")
         and hasattr(obj, "Base")
+        and (
+            obj.isDerivedFrom("App::FeaturePython")
+            or obj.isDerivedFrom("Part::FeaturePython")
+        )
     )
 
 
@@ -1028,8 +1228,8 @@ class Ray:
     def Activated(self):
         """Will be called when the feature is executed."""
         # Generate commands in the FreeCAD python console to create Ray
-        Gui.doCommand("import OpticsWorkbench")
-        Gui.doCommand("OpticsWorkbench.makeRay()")
+        Gui.doCommand("import sa_OpticsWorkbench")
+        Gui.doCommand("sa_OpticsWorkbench.makeRay()")
 
     def IsActive(self):
         """Here you can define if the command must be active or not (greyed) if certain conditions
@@ -1044,7 +1244,7 @@ class Ray:
         return {
             "Pixmap": os.path.join(_icondir_, "ray.svg"),
             "Accel": "",  # a default shortcut (optional)
-            "MenuText": QT_TRANSLATE_NOOP("Ray (monochrome)", "Ray (monochrome)"),
+            "MenuText": translate("Ray (monochrome)", "Ray (monochrome)"),
             "ToolTip": __doc__,
         }
 
@@ -1055,8 +1255,8 @@ class RaySun:
     def Activated(self):
         """Will be called when the feature is executed."""
         # Generate commands in the FreeCAD python console to create Ray
-        Gui.doCommand("import OpticsWorkbench")
-        Gui.doCommand("OpticsWorkbench.makeSunRay()")
+        Gui.doCommand("import sa_OpticsWorkbench")
+        Gui.doCommand("sa_OpticsWorkbench.makeSunRay()")
 
     def IsActive(self):
         """Here you can define if the command must be active or not (greyed) if certain conditions
@@ -1071,8 +1271,8 @@ class RaySun:
         return {
             "Pixmap": os.path.join(_icondir_, "raysun.svg"),
             "Accel": "",  # a default shortcut (optional)
-            "MenuText": QT_TRANSLATE_NOOP("Ray (sun light)", "Ray (sun light)"),
-            "ToolTip": QT_TRANSLATE_NOOP(
+            "MenuText": translate("Ray (sun light)", "Ray (sun light)"),
+            "ToolTip": translate(
                 "Ray (sun light)",
                 "A bunch of rays with different wavelengths of visible light",
             ),
@@ -1085,9 +1285,9 @@ class Beam2D:
     def Activated(self):
         """Will be called when the feature is executed."""
         # Generate commands in the FreeCAD python console to create Ray
-        Gui.doCommand("import OpticsWorkbench")
+        Gui.doCommand("import sa_OpticsWorkbench")
         Gui.doCommand(
-            'OpticsWorkbench.makeRay(beamNrColumns=50, beamDistance=0.1, rayBundleType="parallel")'
+            'sa_OpticsWorkbench.makeRay(beamNrColumns=50, beamDistance=0.1, rayBundleType="parallel")'
         )
 
     def IsActive(self):
@@ -1103,10 +1303,8 @@ class Beam2D:
         return {
             "Pixmap": os.path.join(_icondir_, "rayarray.svg"),
             "Accel": "",  # a default shortcut (optional)
-            "MenuText": QT_TRANSLATE_NOOP("Beam", "2D Beam"),
-            "ToolTip": QT_TRANSLATE_NOOP(
-                "Beam", "A row of multiple rays for raytracing"
-            ),
+            "MenuText": translate("Beam", "2D Beam"),
+            "ToolTip": translate("Beam", "A row of multiple rays for raytracing"),
         }
 
 
@@ -1116,9 +1314,9 @@ class RadialBeam2D:
     def Activated(self):
         """Will be called when the feature is executed."""
         # Generate commands in the FreeCAD python console to create Ray
-        Gui.doCommand("import OpticsWorkbench")
+        Gui.doCommand("import sa_OpticsWorkbench")
         Gui.doCommand(
-            'OpticsWorkbench.makeRay(beamNrColumns=64, rayBundleType="spherical")'
+            'sa_OpticsWorkbench.makeRay(beamNrColumns=64, rayBundleType="spherical")'
         )
 
     def IsActive(self):
@@ -1134,8 +1332,8 @@ class RadialBeam2D:
         return {
             "Pixmap": os.path.join(_icondir_, "sun.svg"),
             "Accel": "",  # a default shortcut (optional)
-            "MenuText": QT_TRANSLATE_NOOP("2D Radial Beam", "2D Radial Beam"),
-            "ToolTip": QT_TRANSLATE_NOOP(
+            "MenuText": translate("2D Radial Beam", "2D Radial Beam"),
+            "ToolTip": translate(
                 "2D Radial Beam",
                 "Rays coming from one point going to all directions in a 2D plane",
             ),
@@ -1148,9 +1346,9 @@ class SphericalBeam:
     def Activated(self):
         """Will be called when the feature is executed."""
         # Generate commands in the FreeCAD python console to create Ray
-        Gui.doCommand("import OpticsWorkbench")
+        Gui.doCommand("import sa_OpticsWorkbench")
         Gui.doCommand(
-            'OpticsWorkbench.makeRay(beamNrColumns=8, beamNrRows=8, rayBundleType="spherical")'
+            'sa_OpticsWorkbench.makeRay(beamNrColumns=8, beamNrRows=8, rayBundleType="spherical")'
         )
 
     def IsActive(self):
@@ -1166,8 +1364,8 @@ class SphericalBeam:
         return {
             "Pixmap": os.path.join(_icondir_, "sun3D.svg"),
             "Accel": "",  # a default shortcut (optional)
-            "MenuText": QT_TRANSLATE_NOOP("Spherical Beam", "Spherical Beam"),
-            "ToolTip": QT_TRANSLATE_NOOP(
+            "MenuText": translate("Spherical Beam", "Spherical Beam"),
+            "ToolTip": translate(
                 "Spherical Beam", "Rays coming from one point going to all directions"
             ),
         }
@@ -1179,8 +1377,8 @@ class RedrawAll:
     def Activated(self):
         """Will be called when the feature is executed."""
         # Generate commands in the FreeCAD python console to create Ray
-        Gui.doCommand("import OpticsWorkbench")
-        Gui.doCommand("OpticsWorkbench.restartAll()")
+        Gui.doCommand("import sa_OpticsWorkbench")
+        Gui.doCommand("sa_OpticsWorkbench.restartAll()")
 
     def IsActive(self):
         """Here you can define if the command must be active or not (greyed) if certain conditions
@@ -1195,8 +1393,8 @@ class RedrawAll:
         return {
             "Pixmap": os.path.join(_icondir_, "Anonymous_Lightbulb_Lit.svg"),
             "Accel": "",  # a default shortcut (optional)
-            "MenuText": QT_TRANSLATE_NOOP("Start", "(Re)start simulation"),
-            "ToolTip": QT_TRANSLATE_NOOP("Start", "(Re)start simulation"),
+            "MenuText": translate("Start", "(Re)start simulation"),
+            "ToolTip": translate("Start", "(Re)start simulation"),
         }
 
 
@@ -1206,8 +1404,8 @@ class AllOff:
     def Activated(self):
         """Will be called when the feature is executed."""
         # Generate commands in the FreeCAD python console to create Ray
-        Gui.doCommand("import OpticsWorkbench")
-        Gui.doCommand("OpticsWorkbench.allOff()")
+        Gui.doCommand("import sa_OpticsWorkbench")
+        Gui.doCommand("sa_OpticsWorkbench.allOff()")
 
     def IsActive(self):
         """Here you can define if the command must be active or not (greyed) if certain conditions
@@ -1222,8 +1420,8 @@ class AllOff:
         return {
             "Pixmap": os.path.join(_icondir_, "Anonymous_Lightbulb_Off.svg"),
             "Accel": "",  # a default shortcut (optional)
-            "MenuText": QT_TRANSLATE_NOOP("Off", "Switch off lights"),
-            "ToolTip": QT_TRANSLATE_NOOP("Off", "Switch off all rays and beams"),
+            "MenuText": translate("Off", "Switch off lights"),
+            "ToolTip": translate("Off", "Switch off all rays and beams"),
         }
 
 
@@ -1231,9 +1429,9 @@ class GridToFocalBeam:
     """A grid of rays converging toward a focal point"""
 
     def Activated(self):
-        Gui.doCommand("import OpticsWorkbench")
+        Gui.doCommand("import sa_OpticsWorkbench")
         Gui.doCommand(
-            'r = OpticsWorkbench.makeRay(beamNrColumns=10, beamNrRows=3, beamDistance=1.0, rayBundleType="focal", focalPoint=FreeCAD.Vector(0, 0, 100))'
+            'r = sa_OpticsWorkbench.makeRay(beamNrColumns=10, beamNrRows=3, beamDistance=1.0, rayBundleType="focal", focalPoint=FreeCAD.Vector(0, 0, 100))'
         )
 
     def IsActive(self):
@@ -1245,8 +1443,8 @@ class GridToFocalBeam:
                 _icondir_, "raygridfocal.svg"
             ),  # You can add your own icon
             "Accel": "",
-            "MenuText": QT_TRANSLATE_NOOP("Grid Focal Beam", "Grid Focal Beam"),
-            "ToolTip": QT_TRANSLATE_NOOP(
+            "MenuText": translate("Grid Focal Beam", "Grid Focal Beam"),
+            "ToolTip": translate(
                 "Grid Focal Beam", "Grid of rays all directed toward a focal point"
             ),
         }

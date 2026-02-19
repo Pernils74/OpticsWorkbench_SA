@@ -3,48 +3,63 @@ import Sketcher
 import Part
 import FreeCAD as App
 import FreeCADGui as Gui
-from BOPTools import BOPFeatures
 import sa_OpticsWorkbench
 import os
 from PySide.QtCore import QT_TRANSLATE_NOOP
 
 _icondir_ = os.path.join(os.path.dirname(__file__), "..")
-_exname_ = QT_TRANSLATE_NOOP("ExampleHierarchy3D", "Example - Hierarchy 3D")
+_exname_ = QT_TRANSLATE_NOOP("ExampleHierarchy2D", "Example - Hierarchy 2D")
 
 
 def makeLens(doc, name):
-    sphere = doc.addObject("Part::Sphere", name + "_sphere")
-    box = doc.addObject("Part::Box", name + "_box")
-    box.Placement.Base = Vector(-2, -5, -5)
-    bp = BOPFeatures.BOPFeatures(doc)
-    cut = bp.make_cut([sphere.Label, box.Label])
-    cut.Label = name + "_cut"
-    cut.Placement.Base = Vector(0, 10, 0)
-    cut.Placement.Rotation = Rotation(-42, 0, 0)
-    lens = sa_OpticsWorkbench.makeLens([cut])
+    sketch = doc.addObject("Sketcher::SketchObject", name + "_sketch")
+    circle = Part.Circle(Vector(2, 0, 0), Vector(0, 0, 1), 5)
+    arc = Part.ArcOfCircle(circle, 2, 4)
+    sketch.addGeometry(arc)
+    line = Part.LineSegment(Vector(0, 4.5, 0), Vector(0, -4.5, 0))
+    sketch.addGeometry(line)
+    sketch.addConstraint(Sketcher.Constraint("Radius", 0, 5))
+    sketch.addConstraint(Sketcher.Constraint("PointOnObject", 0, 1, -2))
+    sketch.addConstraint(Sketcher.Constraint("PointOnObject", 0, 2, -2))
+    sketch.addConstraint(Sketcher.Constraint("Coincident", 1, 1, 0, 1))
+    sketch.addConstraint(Sketcher.Constraint("Coincident", 0, 2, 1, 2))
+    sketch.addConstraint(Sketcher.Constraint("PointOnObject", 0, 3, -1))
+    sketch.addConstraint(Sketcher.Constraint("DistanceX", 0, 3, 2))
+    sketch.Placement.Base = Vector(0, 19, 0)
+    sketch.Placement.Rotation = Rotation(-42, 0, 0)
+    lens = sa_OpticsWorkbench.makeLens([sketch])
     lens.Label = name
     return lens
 
 
 def makeMirror(doc, name):
-    box = doc.addObject("Part::Box", name + "_box")
-    box.Length = 2.0
-    box.Placement.Base = Vector(5, -2.0, -5.0)
-    box.Placement.Rotation = Rotation(-10, 0, 0)
-    mirror = sa_OpticsWorkbench.makeMirror([box])
+    sketch = doc.addObject("Sketcher::SketchObject", name + "_sketch")
+    sketch.addGeometry(
+        Part.LineSegment(Vector(10.0, 0.0, 0.0), Vector(12.0, 10.0, 0.0))
+    )
+    mirror = sa_OpticsWorkbench.makeMirror([sketch])
     mirror.Label = name
     return mirror
 
 
-def makeRay(name):
+def makeRay_old(name):
     ray = sa_OpticsWorkbench.makeRay(
-        Vector(0, 0, 0),
-        Vector(2.0, 1.0, 0),
-        beamNrColumns=10,
-        beamNrRows=10,
-        beamDistance=0.4,
+        Vector(0, 0, 0), Vector(2.0, 1.0, 0), beamNrColumns=10, beamDistance=0.4
     )
-    ray.Placement.Base = Vector(0, -1.5, -2)
+    ray.Placement.Base = Vector(0, -1.5, 0)
+    ray.Label = name
+    return ray
+
+
+def makeRay(name):
+    # Basriktning: lokal +Z (matchar nya OpticsWorkbench standard)
+    dir_vector = Vector(0, 0, 1)
+
+    ray = sa_OpticsWorkbench.makeRay(
+        Vector(0, 0, 0), dir_vector, beamNrColumns=10, beamDistance=0.4
+    )
+
+    ray.Placement.Base = Vector(0, -1.5, 0)
     ray.Label = name
     return ray
 
@@ -57,7 +72,7 @@ def createRayInsideMirrorInside(doc):
     obj.addObject(lens)
     ray = makeRay("ray_a")
     obj.addObject(ray)
-    obj.Placement.Base = Vector(-30.0, -30.0, 0.0)
+    obj.Placement.Base += Vector(-30.0, -30.0, 0.0)
     ray.MaxRayLength = 24.0
     return obj
 
@@ -122,7 +137,7 @@ def make_optics():
     doc.recompute()
 
 
-class ExampleHierarchy3D:
+class ExampleHierarchy2D:
     """This class will be loaded when the workbench is activated in FreeCAD. You must restart FreeCAD to apply changes in this class"""
 
     def Activated(self):
@@ -143,4 +158,4 @@ class ExampleHierarchy3D:
         }
 
 
-Gui.addCommand("ExampleHierarchy3D", ExampleHierarchy3D())
+Gui.addCommand("sa_ExampleHierarchy2D", ExampleHierarchy2D())
