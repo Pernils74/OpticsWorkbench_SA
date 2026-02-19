@@ -1,0 +1,6 @@
+{
+    "editor.formatOnSave": true,
+    "python.analysis.typeCheckingMode": "off",
+    "html.format.wrapLineLength": 180,
+    "editor.wordWrapColumn": 160
+}
