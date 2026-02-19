@@ -32,6 +32,9 @@ class OpticsWorkbench_SA(Workbench):
         import SA_Ray
         import SA_OpticalObject
         import SA_Plot
+
+        import sa_Dock as DockCmd
+
         from examples import (
             example1,
             example3D,
@@ -66,6 +69,10 @@ class OpticsWorkbench_SA(Workbench):
             QT_TRANSLATE_NOOP("Workbench", "SA_RayHits"),
             QT_TRANSLATE_NOOP("Workbench", "SA_Hits2CSV"),
         ]
+
+        # adding of new dock widget to the workbench
+        optics_dock = ["SA_Dock"]
+
         separator = ["Separator"]
         examples = [
             QT_TRANSLATE_NOOP("Workbench", "Example2D"),
@@ -77,9 +84,19 @@ class OpticsWorkbench_SA(Workbench):
             QT_TRANSLATE_NOOP("Workbench", "ExampleHierarchy3D"),
         ]
         self.list = (
-            rays + separator + optics + separator + actions + separator + analysis
+            optics_dock
+            + rays
+            + separator
+            + optics
+            + separator
+            + actions
+            + separator
+            + analysis
         )  # A list of command names created in the line above
         self.menu = self.list + separator + examples
+
+        # Send commandlist to dock panel, remove it self from list to avoid duplication
+        DockCmd.set_command_lists(self.list, self.menu, remove_command="SA_Dock")
 
         self.appendToolbar(
             self.__class__.MenuText, self.list
