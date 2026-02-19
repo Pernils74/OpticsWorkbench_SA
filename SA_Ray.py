@@ -11,7 +11,7 @@ import Part
 import math
 import traceback
 from wavelength_to_rgb.gentable import wavelen2rgb
-import SA_OpticalObject
+import sa_OpticalObject
 import FreeCAD
 
 translate = FreeCAD.Qt.translate
@@ -558,7 +558,7 @@ class RayWorker:
             newRefIdx = self.lastRefIdx[len(self.lastRefIdx) - 2]
 
         if len(nearest_obj.Sellmeier) == 6:
-            n = SA_OpticalObject.refraction_index_from_sellmeier(
+            n = sa_OpticalObject.refraction_index_from_sellmeier(
                 fp.Wavelength, nearest_obj.Sellmeier
             )
         else:
@@ -592,7 +592,7 @@ class RayWorker:
             newRefIdx = self.lastRefIdx[len(self.lastRefIdx) - 2]
 
         if len(nearest_obj.Sellmeier) == 6:
-            n = SA_OpticalObject.refraction_index_from_sellmeier(
+            n = sa_OpticalObject.refraction_index_from_sellmeier(
                 fp.Wavelength, nearest_obj.Sellmeier
             )
         else:

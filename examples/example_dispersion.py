@@ -3,7 +3,7 @@ import Sketcher
 import Part
 import FreeCAD as App
 import FreeCADGui as Gui
-import SA_OpticsWorkbench
+import sa_OpticsWorkbench
 import os
 from PySide.QtCore import QT_TRANSLATE_NOOP
 
@@ -50,8 +50,8 @@ def make_optics():
 
     prism = create_prism(doc)
     doc.recompute()
-    SA_OpticsWorkbench.makeLens(prism, material="PMMA (plexiglass)").Label = "Refractor"
-    SA_OpticsWorkbench.makeSunRay(maxRayLength=2.0)
+    sa_OpticsWorkbench.makeLens(prism, material="PMMA (plexiglass)").Label = "Refractor"
+    sa_OpticsWorkbench.makeSunRay(maxRayLength=2.0)
     doc.recompute()
 
 

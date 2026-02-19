@@ -2,12 +2,12 @@
 
 import os
 from FreeCAD import Vector, Rotation, activeDocument
-import SA_Ray
-import SA_OpticalObject
+import sa_Ray
+import sa_OpticalObject
 import SunRay
 from numpy import linspace
 from importlib import reload
-import SA_Plot
+import sa_Plot
 
 
 def recompute():
@@ -42,7 +42,7 @@ def makeRay(
     focalPoint=Vector(0, 0, 100),
     rayBundleType="",
 ):
-    reload(SA_Ray)
+    reload(sa_Ray)
     """Python command to create a light ray."""
     name = "Ray"
     if beamNrColumns * beamNrRows > 1:
@@ -53,7 +53,7 @@ def makeRay(
     fp = activeDocument().addObject("Part::FeaturePython", name)
     fp.Placement.Base = position
     fp.Placement.Rotation = Rotation(Vector(1, 0, 0), direction)
-    SA_Ray.RayWorker(
+    sa_Ray.RayWorker(
         fp,
         power,
         spherical,
@@ -71,7 +71,7 @@ def makeRay(
         focalPoint,
         rayBundleType,
     )
-    SA_Ray.RayViewProvider(fp.ViewObject)
+    sa_Ray.RayViewProvider(fp.ViewObject)
     recompute()
     return fp
 
@@ -158,7 +158,7 @@ def allOff():
         if isRay(obj):
             obj.Power = False
 
-        elif SA_Ray.isOpticalObject(obj):
+        elif sa_Ray.isOpticalObject(obj):
             for a in dir(obj):
                 if (
                     a.startswith("HitsFrom")
@@ -174,14 +174,15 @@ def makeMirror(base=[], collectStatistics=False, transparency=0):
     # reload(OpticalObject)
     """All FreeCAD objects in base will be optical mirrors."""
     fp = activeDocument().addObject("Part::FeaturePython", "Mirror")
-    SA_OpticalObject.OpticalObjectWorker(
+    sa_OpticalObject.OpticalObjectWorker(
         fp,
         base,
         type="mirror",
         collectStatistics=collectStatistics,
         transparency=transparency,
     )
-    SA_OpticalObject.OpticalObjectViewProvider(fp.ViewObject)
+    sa_OpticalObject.OpticalObjectViewProvider(fp.ViewObject)
+
     recompute()
     return fp
 
@@ -190,14 +191,15 @@ def makeAbsorber(base=[], collectStatistics=False, transparency=0):
     # reload(OpticalObject)
     """All FreeCAD objects in base will be optical light absorbers."""
     fp = activeDocument().addObject("Part::FeaturePython", "Absorber")
-    SA_OpticalObject.OpticalObjectWorker(
+    sa_OpticalObject.OpticalObjectWorker(
         fp,
         base,
         type="absorber",
         collectStatistics=collectStatistics,
         transparency=transparency,
     )
-    SA_OpticalObject.OpticalObjectViewProvider(fp.ViewObject)
+    sa_OpticalObject.OpticalObjectViewProvider(fp.ViewObject)
+
     recompute()
     return fp
 
@@ -212,7 +214,7 @@ def makeLens(
     # reload(OpticalObject)
     """All FreeCAD objects in base will be optical lenses."""
     fp = activeDocument().addObject("Part::FeaturePython", "Lens")
-    SA_OpticalObject.LensWorker(
+    sa_OpticalObject.LensWorker(
         fp,
         base,
         RefractionIndex,
@@ -220,7 +222,8 @@ def makeLens(
         collectStatistics,
         transparency=transparency,
     )
-    SA_OpticalObject.OpticalObjectViewProvider(fp.ViewObject)
+    sa_OpticalObject.OpticalObjectViewProvider(fp.ViewObject)
+
     recompute()
     return fp
 
@@ -238,7 +241,7 @@ def makeGrating(
     # reload(OpticalObject)
     """All FreeCAD objects in base will be diffraction gratings."""
     fp = activeDocument().addObject("Part::FeaturePython", "Grating")
-    SA_OpticalObject.GratingWorker(
+    sa_OpticalObject.GratingWorker(
         fp,
         base,
         RefractionIndex,
@@ -249,7 +252,8 @@ def makeGrating(
         order,
         collectStatistics,
     )
-    SA_OpticalObject.OpticalObjectViewProvider(fp.ViewObject)
+    sa_OpticalObject.OpticalObjectViewProvider(fp.ViewObject)
+
     recompute()
     return fp
 
@@ -280,7 +284,7 @@ def plot_xy(absorber):
 
 def drawPlot(selectedObjList):
     ## Create the list of selected absorbers; if none then skip
-    SA_Plot.PlotRayHits.plot3D(selectedObjList)
+    sa_Plot.PlotRayHits.plot3D(selectedObjList)
 
 
 def Hits2CSV():
@@ -297,7 +301,7 @@ def Hits2CSV():
 
     coords_per_beam = []
     for eachObject in activeDocument().Objects:
-        if SA_Ray.isOpticalObject(eachObject):
+        if sa_Ray.isOpticalObject(eachObject):
             # all_coords = np.array([coord for coords in coords_per_beam for coord in coords])
             for attr in dir(eachObject):
                 if attr.startswith("HitCoordsFrom"):

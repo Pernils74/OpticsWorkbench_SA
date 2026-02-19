@@ -3,7 +3,7 @@ import Sketcher
 import Part
 import FreeCAD as App
 import FreeCADGui as Gui
-import SA_OpticsWorkbench
+import sa_OpticsWorkbench
 import os
 from PySide.QtCore import QT_TRANSLATE_NOOP
 
@@ -178,15 +178,15 @@ def make_optics():
     Sketch_Lens = createSketch_Sketch_Lens(doc)
     Sketch_Prism = createSketch_Sketch_Prism(doc)
 
-    SA_OpticsWorkbench.makeMirror([Sketch_Mirror1, Sketch_Mirror2])
-    SA_OpticsWorkbench.makeAbsorber([Sketch_Box1, Sketch_Box2], True)
-    SA_OpticsWorkbench.makeLens(
+    sa_OpticsWorkbench.makeMirror([Sketch_Mirror1, Sketch_Mirror2])
+    sa_OpticsWorkbench.makeAbsorber([Sketch_Box1, Sketch_Box2], True)
+    sa_OpticsWorkbench.makeLens(
         [Sketch_Lens, Sketch_Prism], material="NBK7/Window glass"
     )
 
     doc.recompute()
-    SA_OpticsWorkbench.makeRay(Vector(75.00, 0.00, 0.00), Vector(-1, 0, 0))
-    SA_OpticsWorkbench.makeRay(beamNrColumns=50)
+    sa_OpticsWorkbench.makeRay(Vector(75.00, 0.00, 0.00), Vector(-1, 0, 0))
+    sa_OpticsWorkbench.makeRay(beamNrColumns=50)
 
     doc.recompute()
 

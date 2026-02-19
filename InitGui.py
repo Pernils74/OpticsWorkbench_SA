@@ -10,12 +10,12 @@ __version__ = "0.0.1"
 class OpticsWorkbench_SA(Workbench):
     def __init__(self):
         import os
-        import SA_OpticsWorkbench
+        import sa_OpticsWorkbench
         import FreeCADGui
 
         translate = FreeCAD.Qt.translate
         translations_path = os.path.join(
-            SA_OpticsWorkbench.get_module_path(), "translations"
+            sa_OpticsWorkbench.get_module_path(), "translations"
         )
         FreeCADGui.addLanguagePath(translations_path)
         FreeCADGui.updateLocale()
@@ -23,16 +23,17 @@ class OpticsWorkbench_SA(Workbench):
         self.__class__.MenuText = "Optics_SA"
         self.__class__.ToolTip = translate("Workbench", "Ray Tracing Simulation")
         self.__class__.Icon = os.path.join(
-            SA_OpticsWorkbench.get_module_path(), "optics_workbench_icon.svg"
+            sa_OpticsWorkbench.get_module_path(), "optics_workbench_icon.svg"
         )
 
     def Initialize(self):
         """This function is executed when FreeCAD starts"""
         # import here all the needed files that create your FreeCAD commands
-        import SA_Ray
-        import SA_OpticalObject
-        import SA_Plot
+        import sa_Ray
+        import sa_OpticalObject
+        import sa_Plot
 
+        import sa_LiveSheets
         import sa_Dock as DockCmd
 
         from examples import (
@@ -68,6 +69,7 @@ class OpticsWorkbench_SA(Workbench):
         analysis = [
             QT_TRANSLATE_NOOP("Workbench", "SA_RayHits"),
             QT_TRANSLATE_NOOP("Workbench", "SA_Hits2CSV"),
+            QT_TRANSLATE_NOOP("Workbench", "SA_LiveSheets"),
         ]
 
         # adding of new dock widget to the workbench

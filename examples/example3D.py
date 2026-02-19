@@ -3,7 +3,7 @@ import FreeCADGui as Gui
 import os
 from FreeCAD import Vector, Placement, Rotation
 import FreeCAD as app
-import SA_OpticsWorkbench
+import sa_OpticsWorkbench
 from PySide.QtCore import QT_TRANSLATE_NOOP
 
 _icondir_ = os.path.join(os.path.dirname(__file__), "..")
@@ -67,12 +67,12 @@ def make_Test3D():
 
     doc.recompute()
 
-    SA_OpticsWorkbench.makeMirror([Cube, Sphere, Cone], True)
-    SA_OpticsWorkbench.makeAbsorber([Cylinder])
-    SA_OpticsWorkbench.makeLens([HalfSphere])
+    sa_OpticsWorkbench.makeMirror([Cube, Sphere, Cone], True)
+    sa_OpticsWorkbench.makeAbsorber([Cylinder])
+    sa_OpticsWorkbench.makeLens([HalfSphere])
 
     doc.recompute()
-    SA_OpticsWorkbench.makeRay(beamNrColumns=20, beamNrRows=10, beamDistance=0.05)
+    sa_OpticsWorkbench.makeRay(beamNrColumns=20, beamNrRows=10, beamDistance=0.05)
 
     doc.recompute()
 

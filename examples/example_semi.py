@@ -3,7 +3,7 @@ import Sketcher
 import Part
 import FreeCAD as App
 import FreeCADGui as Gui
-import SA_OpticsWorkbench
+import sa_OpticsWorkbench
 import os
 from PySide.QtCore import QT_TRANSLATE_NOOP
 
@@ -89,7 +89,7 @@ def make_semi():
     doc = App.activeDocument()
 
     Sketch = createSketch_Sketch(doc)
-    Mirror_semi40 = SA_OpticsWorkbench.makeMirror([Sketch], True, 40)
+    Mirror_semi40 = sa_OpticsWorkbench.makeMirror([Sketch], True, 40)
     Mirror_semi40.Label = "Mirror_semi40"
 
     Cube = doc.addObject("Part::Box", "Cube")
@@ -97,11 +97,11 @@ def make_semi():
     Cube.Length = 2.0
     Cube.Placement = Placement(Vector(27.0, -5.0, -1.0), Rotation(0.0, 0.0, 0.0, 1.0))
     Cube.ViewObject.Transparency = 50
-    Absorber_semi50 = SA_OpticsWorkbench.makeAbsorber([Cube], True, 50)
+    Absorber_semi50 = sa_OpticsWorkbench.makeAbsorber([Cube], True, 50)
     Absorber_semi50.Label = "Absorber_semi50"
 
     Sketch002 = createSketch_Sketch002(doc)
-    Lens_semi80 = SA_OpticsWorkbench.makeLens(
+    Lens_semi80 = sa_OpticsWorkbench.makeLens(
         [Sketch002],
         material="NBK7/Window glass",
         collectStatistics=True,
@@ -110,13 +110,13 @@ def make_semi():
     Lens_semi80.Label = "Lens_semi80"
 
     Sketch003 = createSketch_Sketch003(doc)
-    FullAbsorber = SA_OpticsWorkbench.makeAbsorber([Sketch003], True, 0)
+    FullAbsorber = sa_OpticsWorkbench.makeAbsorber([Sketch003], True, 0)
     FullAbsorber.Label = "FullAbsorber"
 
     doc.recompute()
-    SA_OpticsWorkbench.makeRay(beamNrColumns=3, beamDistance=0.2)
+    sa_OpticsWorkbench.makeRay(beamNrColumns=3, beamDistance=0.2)
     doc.recompute()
-    SA_OpticsWorkbench.Hits2CSV()
+    sa_OpticsWorkbench.Hits2CSV()
     doc.recompute()
     Gui.ActiveDocument = doc
 

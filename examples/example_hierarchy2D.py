@@ -3,7 +3,7 @@ import Sketcher
 import Part
 import FreeCAD as App
 import FreeCADGui as Gui
-import SA_OpticsWorkbench
+import sa_OpticsWorkbench
 import os
 from PySide.QtCore import QT_TRANSLATE_NOOP
 
@@ -27,7 +27,7 @@ def makeLens(doc, name):
     sketch.addConstraint(Sketcher.Constraint("DistanceX", 0, 3, 2))
     sketch.Placement.Base = Vector(0, 19, 0)
     sketch.Placement.Rotation = Rotation(-42, 0, 0)
-    lens = SA_OpticsWorkbench.makeLens([sketch])
+    lens = sa_OpticsWorkbench.makeLens([sketch])
     lens.Label = name
     return lens
 
@@ -37,13 +37,13 @@ def makeMirror(doc, name):
     sketch.addGeometry(
         Part.LineSegment(Vector(10.0, 0.0, 0.0), Vector(12.0, 10.0, 0.0))
     )
-    mirror = SA_OpticsWorkbench.makeMirror([sketch])
+    mirror = sa_OpticsWorkbench.makeMirror([sketch])
     mirror.Label = name
     return mirror
 
 
 def makeRay(name):
-    ray = SA_OpticsWorkbench.makeRay(
+    ray = sa_OpticsWorkbench.makeRay(
         Vector(0, 0, 0), Vector(2.0, 1.0, 0), beamNrColumns=10, beamDistance=0.4
     )
     ray.Placement.Base = Vector(0, -1.5, 0)

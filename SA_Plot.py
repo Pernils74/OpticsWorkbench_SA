@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import FreeCADGui as Gui
 from FreeCAD import activeDocument
 import os
-import SA_Ray
+import sa_Ray
 
 from PySide.QtCore import QT_TRANSLATE_NOOP
 
@@ -26,7 +26,7 @@ class PlotRayHits:
             for eachObject in selectedObjList:
                 # print("Looping through: ", eachObject.Label)
                 try:
-                    if SA_Ray.isOpticalObject(eachObject):
+                    if sa_Ray.isOpticalObject(eachObject):
                         # coords = []
                         attr_names[len(attr_names) :] = [
                             attr
@@ -56,11 +56,11 @@ class PlotRayHits:
                 ypresent = False
                 zpresent = False
                 for co in all_coords:
-                    if abs(startx - co[0]) > SA_Ray.EPSILON:
+                    if abs(startx - co[0]) > sa_Ray.EPSILON:
                         xpresent = True
-                    if abs(starty - co[1]) > SA_Ray.EPSILON:
+                    if abs(starty - co[1]) > sa_Ray.EPSILON:
                         ypresent = True
-                    if abs(startz - co[2]) > SA_Ray.EPSILON:
+                    if abs(startz - co[2]) > sa_Ray.EPSILON:
                         zpresent = True
 
                 fig = plt.figure()

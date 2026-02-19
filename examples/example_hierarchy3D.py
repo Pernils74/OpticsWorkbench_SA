@@ -4,7 +4,7 @@ import Part
 import FreeCAD as App
 import FreeCADGui as Gui
 from BOPTools import BOPFeatures
-import SA_OpticsWorkbench
+import sa_OpticsWorkbench
 import os
 from PySide.QtCore import QT_TRANSLATE_NOOP
 
@@ -21,7 +21,7 @@ def makeLens(doc, name):
     cut.Label = name + "_cut"
     cut.Placement.Base = Vector(0, 10, 0)
     cut.Placement.Rotation = Rotation(-42, 0, 0)
-    lens = SA_OpticsWorkbench.makeLens([cut])
+    lens = sa_OpticsWorkbench.makeLens([cut])
     lens.Label = name
     return lens
 
@@ -31,13 +31,13 @@ def makeMirror(doc, name):
     box.Length = 2.0
     box.Placement.Base = Vector(5, -2.0, -5.0)
     box.Placement.Rotation = Rotation(-10, 0, 0)
-    mirror = SA_OpticsWorkbench.makeMirror([box])
+    mirror = sa_OpticsWorkbench.makeMirror([box])
     mirror.Label = name
     return mirror
 
 
 def makeRay(name):
-    ray = SA_OpticsWorkbench.makeRay(
+    ray = sa_OpticsWorkbench.makeRay(
         Vector(0, 0, 0),
         Vector(2.0, 1.0, 0),
         beamNrColumns=10,

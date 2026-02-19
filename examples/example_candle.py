@@ -3,7 +3,7 @@ import Sketcher
 import Part
 import FreeCAD as App
 import FreeCADGui as Gui
-import SA_OpticsWorkbench
+import sa_OpticsWorkbench
 import os
 from PySide.QtCore import QT_TRANSLATE_NOOP
 
@@ -104,8 +104,8 @@ def make_candle():
     Revolve.ViewObject.PointColor = (1.00, 1.00, 1.00, 1.00)
     Revolve.ViewObject.PointColorArray = [(1.00, 1.00, 1.00, 1.00)]
 
-    SA_OpticsWorkbench.makeAbsorber([Candle1, Candle2])
-    SA_OpticsWorkbench.makeRay(
+    sa_OpticsWorkbench.makeAbsorber([Candle1, Candle2])
+    sa_OpticsWorkbench.makeRay(
         beamNrColumns=10, beamNrRows=10, baseShape=Revolve, maxRayLength=100
     )
 
