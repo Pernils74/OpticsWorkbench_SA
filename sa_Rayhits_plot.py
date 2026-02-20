@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-
-# sa_Rayhits_plot.py
+# sa_Rayhits_plot.py (refactored)
 
 """
 RayHits Advanced Plot (Click Popup + Cluster Blobs)
@@ -12,51 +11,97 @@ YES transparent cluster-blobs per (Ray,PrevHit,Bounce) group
 YES checkbox to show/hide blobs
 
 Uses:
-    rayhits_parser.py   (read_sheet_rows, build_ray_tree)
+    sa_rayhits_parser.py   (read_sheet_rows, build_ray_tree)
 
 Plot encodings:
     Marker     = Ray
-    FinalColor = RGB mix based on PrevHit (R) + BounceCnt (B) with transparency
-
-Layout:
-    Row 0 = main plot
-    Row 1 = legends (Ray / PreviousHit / Bounce)
+    FinalColor = colormap(plasma) by BounceCnt + alpha by PreviousHit
 """
 
+from __future__ import annotations
+
 import os
+import math
+from dataclasses import dataclass
+from typing import Dict, List, Tuple, Any, Iterable, Optional
+
 import FreeCAD as App
 import FreeCADGui as Gui
 from PySide2 import QtWidgets
-import math
 
-# matplotlib
+# --- matplotlib embedding -----------------------------------------------------
 import matplotlib
 
-matplotlib.use("Qt5Agg")
+# Ensure Qt backend (FreeCAD embeds Qt)
+try:
+    matplotlib.use("Qt5Agg")
+except Exception:
+    # In case backend is already set or environment differs
+    pass
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Polygon
+import matplotlib.cm as cm
+import matplotlib.gridspec as gridspec
 
 # External parser
 from sa_rayhits_parser import read_sheet_rows, build_ray_tree
 
-# -------------------------------------------------------
-# Helpers
-# -------------------------------------------------------
+
+# =============================================================================
+# Constants & Types
+# =============================================================================
+
+# Real marker chars (no HTML entities)
+MARKERS: List[str] = ["o", "s", "^", "D", "P", "*", "x", "v", "<", ">"]
+
+DEFAULT_FIGSIZE = (9, 7)
+SCATTER_SIZE = 40
+
+BLOB_FACE_ALPHA = 0.17
+BLOB_EDGE_ALPHA = 0.35
+BLOB_EDGE_LINEWIDTH = 1.3
+
+HOVER_LINEWIDTH = 2.3
+HOVER_EDGECOLOR = "yellow"
 
 
-def get_sheets(doc):
+# tree typing: tree[ray][bounce][prev] = list[(x, y, z, info_dict, energy)]
+RayTree = Dict[str, Dict[Any, Dict[Any, List[Tuple[float, float, float, dict, float]]]]]
+
+
+@dataclass
+class PlotConfig:
+    plane_text: str
+    flip_2d_axes: bool
+    grid_on: bool
+    equal_on: bool
+    show_blobs: bool
+    smooth_blobs: bool
+    blob_strength: float
+
+    @property
+    def is3d(self) -> bool:
+        return self.plane_text.startswith("XYZ")
+
+
+# =============================================================================
+# Geometry helpers
+# =============================================================================
+
+
+def get_sheets(doc) -> List[Any]:
+    """Collect Spreadsheet::Sheet objects from a FreeCAD document."""
     return [o for o in doc.Objects if o.isDerivedFrom("Spreadsheet::Sheet")]
 
 
-# FIX: REAL marker chars
-MARKERS = ["o", "s", "^", "D", "P", "*", "x", "v", "<", ">"]
-
-
-def convex_hull_2d(xs, ys):
+def convex_hull_2d(
+    xs: Iterable[float], ys: Iterable[float]
+) -> List[Tuple[float, float]]:
+    """Monotone chain convex hull in 2D."""
     pts = list({(float(x), float(y)) for x, y in zip(xs, ys)})
     if len(pts) <= 1:
         return pts
@@ -81,10 +126,13 @@ def convex_hull_2d(xs, ys):
     return lower[:-1] + upper[:-1]
 
 
-def smooth_polygon(points, iterations=2):
+def smooth_polygon(
+    points: List[Tuple[float, float]], iterations: int = 2
+) -> List[Tuple[float, float]]:
+    """Chaikin-like corner cutting to get a soft shape."""
     pts = points[:]
     for _ in range(iterations):
-        new_pts = []
+        new_pts: List[Tuple[float, float]] = []
         n = len(pts)
         for i in range(n):
             p0 = pts[i]
@@ -97,107 +145,33 @@ def smooth_polygon(points, iterations=2):
     return pts
 
 
-def point_to_segment_dist(px, py, x1, y1, x2, y2):
+def point_to_segment_dist(
+    px: float, py: float, x1: float, y1: float, x2: float, y2: float
+) -> float:
     """Min distance between point and line segment."""
     dx, dy = x2 - x1, y2 - y1
     if dx == dy == 0:
         return math.hypot(px - x1, py - y1)
     t = ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)
-    t = max(0, min(1, t))
+    t = max(0.0, min(1.0, t))
     nx = x1 + t * dx
     ny = y1 + t * dy
     return math.hypot(px - nx, py - ny)
 
 
-def offset_polygon_auto(points, all_points=None, K=0.35, M=0.20):
-    """
-    AUTO–OFFSET polygon:
-    - Guarantees ALL original points stay inside after smoothing.
-    - Computes margin automatically based on hull tightness.
-
-    points = hull polygon [(x,y)...]
-    all_points = all original group points (px,py)
-    """
-
-    pts = [(float(x), float(y)) for x, y in points]
-    n = len(pts)
-    if n < 3:
-        return pts
-
-    # --- 1) measure hull “tightness” ---
-    if all_points:
-        min_dist = float("inf")
-        for px, py in all_points:
-            for i in range(n):
-                x1, y1 = pts[i]
-                x2, y2 = pts[(i + 1) % n]
-                d = point_to_segment_dist(px, py, x1, y1, x2, y2)
-                min_dist = min(min_dist, d)
-    else:
-        min_dist = 0.0
-
-    # --- 2) measure hull size ---
-    edge_lengths = [
-        math.hypot(pts[(i + 1) % n][0] - pts[i][0], pts[(i + 1) % n][1] - pts[i][1])
-        for i in range(n)
-    ]
-    avg_len = sum(edge_lengths) / len(edge_lengths)
-
-    # --- 3) Auto margin ---
-    #    (higher of “tightness-based” and “scale-based”)
-    margin = max(min_dist * K, avg_len * M)
-
-    # --- 4) Expand polygon using averaged normals (corrected version) ---
-    out = []
-    for i in range(n):
-        x0, y0 = pts[i - 1]
-        x1, y1 = pts[i]
-        x2, y2 = pts[(i + 1) % n]
-
-        # First normal
-        ex1 = x1 - x0
-        ey1 = y1 - y0
-        nx1 = ey1
-        ny1 = -ex1
-        d1 = math.hypot(nx1, ny1)
-        if d1 > 1e-9:
-            nx1 /= d1
-            ny1 /= d1
-
-        # Second normal
-        ex2 = x2 - x1
-        ey2 = y2 - y1
-        nx2 = ey2
-        ny2 = -ex2
-        d2 = math.hypot(nx2, ny2)
-        if d2 > 1e-9:
-            nx2 /= d2
-            ny2 /= d2
-
-        # Combined normal
-        nx = nx1 + nx2
-        ny = ny1 + ny2
-        dn = math.hypot(nx, ny)
-        if dn > 1e-9:
-            nx /= dn
-            ny /= dn
-
-        out.append((x1 + nx * margin, y1 + ny * margin))
-
-    return out
-
-
-def offset_polygon_adaptive(points, strength=0.35):
+def offset_polygon_adaptive(
+    points: List[Tuple[float, float]], strength: float = 0.35
+) -> List[Tuple[float, float]]:
     """
     Adaptive outward offset based on local edge length.
-    Ensures all points remain inside (used after convex hull).
+    Ensures all original hull points remain inside after offset.
     """
     pts = [(float(x), float(y)) for x, y in points]
     n = len(pts)
     if n < 3:
         return pts
 
-    out = []
+    out: List[Tuple[float, float]] = []
     for i in range(n):
         # prev, current, next
         x0, y0 = pts[i - 1]
@@ -210,15 +184,13 @@ def offset_polygon_adaptive(points, strength=0.35):
         local = max(L_prev, L_next)
 
         # normals
-        nx1 = y1 - y0
-        ny1 = -(x1 - x0)
+        nx1, ny1 = y1 - y0, -(x1 - x0)
         d1 = math.hypot(nx1, ny1)
         if d1 > 1e-9:
             nx1 /= d1
             ny1 /= d1
 
-        nx2 = y2 - y1
-        ny2 = -(x2 - x1)
+        nx2, ny2 = y2 - y1, -(x2 - x1)
         d2 = math.hypot(nx2, ny2)
         if d2 > 1e-9:
             nx2 /= d2
@@ -231,93 +203,103 @@ def offset_polygon_adaptive(points, strength=0.35):
             nx /= dn
             ny /= dn
 
-        margin = local * strength  # << ADAPTIVT!
+        margin = local * strength
         out.append((x1 + nx * margin, y1 + ny * margin))
 
     return out
 
 
-# -------------------------------------------------------
-# Color mixer (PrevHit -> red, Bounce -> blue)
-# -------------------------------------------------------
+# =============================================================================
+# Color mixer (PrevHit -> alpha, Bounce -> plasma colormap)
+# =============================================================================
 
 
-def build_color_mixer(prevs, bounces):
-    """
-    NEW COLOR SYSTEM
-    ----------------
-    BounceCnt -> colormap (plasma)
-    PrevHit   -> alpha modulation
+class ColorMixer:
+    """BounceCnt -> perceptual color; PrevHit -> alpha modulation."""
 
-    Gives much stronger visual separation between bounce levels.
-    """
+    def __init__(self, prevs: List[Any], bounces: List[Any]):
+        self.prev_scale = self._build_prev_alpha(prevs)
+        self.bounce_index, self.max_index = self._build_bounce_index(bounces)
+        self.cmap = cm.get_cmap("plasma")
 
-    import matplotlib.cm as cm
-
-    # Normalize helper
-    def norm(i, n):
+    @staticmethod
+    def _norm(i: int, n: int) -> float:
         if n <= 1:
             return 1.0
-        return i / (n - 1)
+        return i / float(n - 1)
 
-    # --- PrevHit controls alpha ---
-    prev_scale = {p: 0.35 + 0.65 * norm(i, len(prevs)) for i, p in enumerate(prevs)}
+    def _build_prev_alpha(self, prevs: List[Any]) -> Dict[Any, float]:
+        return {p: 0.35 + 0.65 * self._norm(i, len(prevs)) for i, p in enumerate(prevs)}
 
-    # --- Bounce uses perceptual colormap ---
-    bounce_list = sorted(bounces)
-    max_index = max(len(bounce_list) - 1, 1)
+    @staticmethod
+    def _build_bounce_index(bounces: List[Any]) -> Tuple[Dict[Any, int], int]:
+        bounce_list = sorted(bounces)
+        max_index = max(len(bounce_list) - 1, 1)
+        return {b: i for i, b in enumerate(bounce_list)}, max_index
 
-    bounce_cmap = cm.get_cmap("plasma")
-
-    bounce_index = {b: i for i, b in enumerate(bounce_list)}
-
-    def mix(prev, bounce):
-        i = bounce_index.get(bounce, 0)
-        t = i / max_index
-
-        r, g, b, _ = bounce_cmap(t)
-
-        alpha = prev_scale.get(prev, 1.0)
-
+    def color(self, prev: Any, bounce: Any) -> Tuple[float, float, float, float]:
+        i = self.bounce_index.get(bounce, 0)
+        t = i / self.max_index
+        r, g, b, _ = self.cmap(t)
+        alpha = self.prev_scale.get(prev, 1.0)
         return (r, g, b, alpha)
 
-    return mix, prev_scale, bounce_index
 
-
-# -------------------------------------------------------
-# Main Dialog
-# -------------------------------------------------------
+# =============================================================================
+# Dialog
+# =============================================================================
 
 
 class RayHitsPlotDialog(QtWidgets.QDialog):
+    """
+    Huvuddialog för plottning av RayHits-data med:
+      - klickbara punkter med popup
+      - valbara Ray-spår (checkboxar)
+      - 2D/3D vy
+      - mjuka 'blobbar' (konvex-hull + smoothing)
+    """
+
     def __init__(self, parent=None):
         super().__init__(parent)
-
         self.setWindowTitle("RayHits Advanced Plot (Click Popup + Blobs)")
         self.resize(1300, 900)
 
+        self._ray_checkboxes: Dict[str, QtWidgets.QCheckBox] = {}
+        self._highlighted_scatter = None
+        self._pick_cid: Optional[int] = None
+
+        self._init_ui()
+        self._connect_signals()
+
+        self.populate_sheets()
+        self.reload_plot()
+
+    # --------------------------------------------------------------------- UI
+
+    def _init_ui(self):
         root = QtWidgets.QVBoxLayout(self)
 
-        # -----------------------------
         # Controls
-        # -----------------------------
         top = QtWidgets.QHBoxLayout()
         root.addLayout(top)
 
+        # Sheet selector
         top.addWidget(QtWidgets.QLabel("Sheet:"))
         self.cmbSheet = QtWidgets.QComboBox()
         top.addWidget(self.cmbSheet)
-
         btnReload = QtWidgets.QPushButton("Reload")
         btnReload.clicked.connect(self.reload_data)
         top.addWidget(btnReload)
 
         top.addSpacing(16)
+
+        # Plane
         top.addWidget(QtWidgets.QLabel("Plane:"))
         self.cmbPlane = QtWidgets.QComboBox()
         self.cmbPlane.addItems(["XY", "XZ", "YZ", "XYZ (3D)"])
         top.addWidget(self.cmbPlane)
 
+        # Toggles
         self.chkFlip = QtWidgets.QCheckBox("Flip axes (2D)")
         top.addWidget(self.chkFlip)
 
@@ -329,76 +311,61 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
         self.chkEqual.setChecked(True)
         top.addWidget(self.chkEqual)
 
-        ### BLOB FEATURE: show/hide transparent cluster blobs
         self.chkBlobs = QtWidgets.QCheckBox("Show group blobs")
         self.chkBlobs.setChecked(True)
         top.addWidget(self.chkBlobs)
 
-        # --- Smooth convex-hull blob toggle ---
         self.chkBlobSmooth = QtWidgets.QCheckBox("Smooth convex hull")
         self.chkBlobSmooth.setChecked(True)
         top.addWidget(self.chkBlobSmooth)
 
-        # --- Strength spinbox ---
         top.addWidget(QtWidgets.QLabel("Strength:"))
         self.spnBlobStrength = QtWidgets.QDoubleSpinBox()
         self.spnBlobStrength.setRange(0.01, 1.00)
         self.spnBlobStrength.setSingleStep(0.01)
-        self.spnBlobStrength.setValue(0.15)  # default
+        self.spnBlobStrength.setValue(0.15)
         self.spnBlobStrength.setDecimals(3)
-        top.addWidget(self.spnBlobStrength)
         self.spnBlobStrength.setToolTip(
-            "Controls how much the smooth convex-hull blob expands.\n"
-            "Lower values = tighter blob (closer to the points).\n"
-            "Higher values = wider, softer, more Gaussian-like blob.\n"
-            "Recommended range: 0.10–0.25"
+            "Controls smooth convex-hull expansion.\n"
+            "Lower = tighter; higher = wider/softer.\n"
+            "Recommended: 0.10–0.25"
         )
-
-        # Knyt signaler
-        self.chkBlobSmooth.stateChanged.connect(self.reload_plot)
-        self.spnBlobStrength.valueChanged.connect(self.reload_plot)
+        top.addWidget(self.spnBlobStrength)
 
         top.addStretch(1)
 
-        # -----------------------------
-        # Ray checkboxes
-        # -----------------------------
+        # Ray checkboxes container
         self.rayBox = QtWidgets.QGroupBox("Visible Rays")
         self.rayLayout = QtWidgets.QVBoxLayout(self.rayBox)
         root.addWidget(self.rayBox)
-        self.ray_checkboxes = {}
 
-        # -----------------------------
         # Figure + Canvas
-        # -----------------------------
-        self.fig = plt.Figure(figsize=(9, 7))
+        self.fig = plt.Figure(figsize=DEFAULT_FIGSIZE)
         self.canvas = FigureCanvas(self.fig)
         self.toolbar = NavigationToolbar(self.canvas, self)
         root.addWidget(self.toolbar)
         root.addWidget(self.canvas)
 
+        # Status
         self.lblStatus = QtWidgets.QLabel("")
         root.addWidget(self.lblStatus)
 
-        # Signals
+    def _connect_signals(self):
         self.cmbSheet.currentIndexChanged.connect(self.reload_plot)
         self.cmbPlane.currentIndexChanged.connect(self.reload_plot)
         self.chkFlip.stateChanged.connect(self.reload_plot)
         self.chkGrid.stateChanged.connect(self.reload_plot)
         self.chkEqual.stateChanged.connect(self.reload_plot)
         self.chkBlobs.stateChanged.connect(self.reload_plot)
+        self.chkBlobSmooth.stateChanged.connect(self.reload_plot)
+        self.spnBlobStrength.valueChanged.connect(self.reload_plot)
 
-        self.populate_sheets()
-        self.reload_plot()
+    # --------------------------------------------------------------- Utilities
 
-        self._highlighted_scatter = None
-
-    # -------------------------------------------------------
     def populate_sheets(self):
         doc = App.ActiveDocument
         if not doc:
             return
-
         sheets = get_sheets(doc)
 
         def sort_key(s):
@@ -417,130 +384,149 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
     def current_sheet(self):
         return self.cmbSheet.currentData()
 
-    # -------------------------------------------------------
-    def rebuild_ray_checkboxes(self, tree):
-        for cb in self.ray_checkboxes.values():
+    def _rebuild_ray_checkboxes(self, tree: RayTree):
+        # clear old
+        for cb in self._ray_checkboxes.values():
             self.rayLayout.removeWidget(cb)
             cb.deleteLater()
-
-        self.ray_checkboxes.clear()
+        self._ray_checkboxes.clear()
 
         for ray in sorted(tree.keys()):
             cb = QtWidgets.QCheckBox(ray)
             cb.setChecked(True)
             cb.stateChanged.connect(self.reload_plot)
             self.rayLayout.addWidget(cb)
-            self.ray_checkboxes[ray] = cb
+            self._ray_checkboxes[ray] = cb
 
     def reload_data(self):
         self.populate_sheets()
         self.reload_plot()
 
-    # -------------------------------------------------------
-    def show_point_popup(self, info):
+    def _gather_config(self) -> PlotConfig:
+        return PlotConfig(
+            plane_text=self.cmbPlane.currentText(),
+            flip_2d_axes=self.chkFlip.isChecked(),
+            grid_on=self.chkGrid.isChecked(),
+            equal_on=self.chkEqual.isChecked(),
+            show_blobs=self.chkBlobs.isChecked(),
+            smooth_blobs=self.chkBlobSmooth.isChecked(),
+            blob_strength=float(self.spnBlobStrength.value()),
+        )
+
+    def _show_point_popup(self, info: Dict[str, Any]):
         dlg = QtWidgets.QMessageBox(self)
         dlg.setWindowTitle("RayHit Info")
         dlg.setText(
-            f"Ray: {info['ray']}\n"
-            f"RayId: {info['id']}\n"
-            f"PreviousHit: {info['prev']}\n"
-            f"BounceCnt: {info['bounce']}\n\n"
-            f"X = {info['x']}\n"
-            f"Y = {info['y']}\n"
-            f"Z = {info['z']}\n"
-            f"Energy = {info['energy']}\n"
+            f"Ray: {info.get('ray')}\n"
+            f"RayId: {info.get('id')}\n"
+            f"PreviousHit: {info.get('prev')}\n"
+            f"BounceCnt: {info.get('bounce')}\n\n"
+            f"X = {info.get('x')}\n"
+            f"Y = {info.get('y')}\n"
+            f"Z = {info.get('z')}\n"
+            f"Energy = {info.get('energy')}\n"
         )
         dlg.exec_()
 
-    # -------------------------------------------------------
-    # MAIN PLOT
-    # -------------------------------------------------------
+    # ------------------------------------------------------------------- Plot
 
     def reload_plot(self):
         sheet = self.current_sheet()
         if not sheet:
+            self.lblStatus.setText("No sheet selected.")
             return
 
-        # 1) Läs data och bygg träd: tree[ray][bounce][prev] = [(x,y,z,info,en)]
-        rows = read_sheet_rows(sheet)
-        tree = build_ray_tree(rows)
+        try:
+            # read sheet & build tree
+            rows = read_sheet_rows(sheet)
+            tree: RayTree = build_ray_tree(rows)
+            self.lblStatus.setText(f"{len(rows)} rows")
 
-        self.lblStatus.setText(f"{len(rows)} rows")
+            # sync ray checkboxes
+            if set(tree.keys()) != set(self._ray_checkboxes.keys()):
+                self._rebuild_ray_checkboxes(tree)
 
-        # Synka Ray-checkboxar (om rays ändrats)
-        if set(tree.keys()) != set(self.ray_checkboxes.keys()):
-            self.rebuild_ray_checkboxes(tree)
+            # build layout: 2 rows (plot + legends)
+            self.fig.clear()
+            gs = gridspec.GridSpec(
+                nrows=2, ncols=1, height_ratios=[12, 2], figure=self.fig
+            )
 
-        # 2) Layout: två rader (plott överst, legender underst)
-        self.fig.clear()
-        import matplotlib.gridspec as gridspec
+            cfg = self._gather_config()
+            ax = self._build_axes(gs, cfg)
+            ax_leg = self.fig.add_subplot(gs[1, 0])
+            ax_leg.set_axis_off()
 
-        gs = gridspec.GridSpec(nrows=2, ncols=1, height_ratios=[12, 2], figure=self.fig)
+            # legend scaffolding
+            rays = sorted(tree.keys())
+            bounces = sorted({b for r in tree.values() for b in r.keys()})
+            prevs = sorted(
+                {
+                    p
+                    for r in tree.values()
+                    for bounce_dict in r.values()
+                    for p in bounce_dict.keys()
+                },
+                key=lambda s: (s is None, str(s)),
+            )
 
-        plane = self.cmbPlane.currentText()
-        is3d = plane.startswith("XYZ")
-        ax = self.fig.add_subplot(gs[0, 0], projection="3d" if is3d else None)
-        # ax.grid(self.chkGrid.isChecked(), linestyle="--", alpha=0.35)
+            ray_marker = {r: MARKERS[i % len(MARKERS)] for i, r in enumerate(rays)}
+            mixer = ColorMixer(prevs, bounces)
 
-        # =======================
-        # GRID HANDLING (2D/3D)
-        # =======================
-        grid_on = self.chkGrid.isChecked()
-        equal_on = self.chkEqual.isChecked()
+            # plot loop
+            scatter_artists = self._draw_groups(ax, tree, ray_marker, mixer, cfg)
 
-        if is3d:
-            # --- GRID ---
-            ax.grid(grid_on)
+            # blobs (2D only)
+            if cfg.show_blobs and not cfg.is3d:
+                self._draw_blobs(ax, tree, ray_marker, mixer, cfg)
 
-            # --- ASPECT ---
-            if equal_on and hasattr(ax, "set_box_aspect"):
+            # legends
+            self._build_legends(ax_leg, rays, prevs, mixer, bounces, ray_marker)
+
+            # pick handler (avoid duplicates)
+            self._install_pick_handler(scatter_artists)
+
+            self.canvas.draw_idle()
+
+        except Exception as e:
+            # Defensive: keep GUI responsive
+            self.lblStatus.setText(f"Error: {e}")
+            # Optional: print to Report View
+            print("RayHitsPlotDialog.reload_plot error:", e)
+
+    def _build_axes(self, gs, cfg: PlotConfig):
+        ax = self.fig.add_subplot(gs[0, 0], projection="3d" if cfg.is3d else None)
+
+        # Grid
+        if cfg.is3d:
+            ax.grid(cfg.grid_on)
+            # Equal box aspect if supported
+            if cfg.equal_on and hasattr(ax, "set_box_aspect"):
                 ax.set_box_aspect([1, 1, 1])
-
         else:
-            # --- GRID ---
-            if grid_on:
+            if cfg.grid_on:
                 ax.grid(True, linestyle="--", alpha=0.35)
             else:
                 ax.grid(False)
 
-            # --- ASPECT ---
-            if equal_on:
+            # Aspect
+            if cfg.equal_on:
                 ax.set_aspect("equal", adjustable="datalim")
             else:
                 ax.set_aspect("auto")
+        return ax
 
-        ax_leg = self.fig.add_subplot(gs[1, 0])
-        ax_leg.set_axis_off()
-
-        flip = self.chkFlip.isChecked()
-        # equal = self.chkEqual.isChecked()
-        show_blobs = self.chkBlobs.isChecked()
-
-        # 3) Legend-underlag (matchar ray -> bounce -> prev)
-        rays = sorted(tree.keys())
-        # nivå 2 = bounce
-        bounces = sorted({b for r in tree.values() for b in r.keys()})
-        # nivå 3 = prev
-        prevs = sorted(
-            {
-                p
-                for r in tree.values()
-                for bounce_dict in r.values()
-                for p in bounce_dict.keys()
-            },
-            key=lambda s: (s is None, str(s)),
-        )
-
-        # Stilmappar
-        ray_marker = {r: MARKERS[i % len(MARKERS)] for i, r in enumerate(rays)}
-        mix_color, prev_scale, bounce_scale = build_color_mixer(prevs, bounces)
-
+    def _draw_groups(
+        self,
+        ax,
+        tree: RayTree,
+        ray_marker: Dict[str, str],
+        mixer: ColorMixer,
+        cfg: PlotConfig,
+    ):
         scatter_artists = []
-        group_points_2D = []  # (px, py, rgba, prev, bounce) för blobbar
-
-        # 4) Plott-loop: Ray -> Bounce -> Prev
         for ray, bounce_dict in tree.items():
-            cb = self.ray_checkboxes.get(ray)
+            cb = self._ray_checkboxes.get(ray)
             if not cb or not cb.isChecked():
                 continue
 
@@ -548,27 +534,25 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
 
             for bounce, prev_dict in bounce_dict.items():
                 for prev, entries in prev_dict.items():
-                    # Färg från (prev, bounce)
-                    color = mix_color(prev, bounce)  # (r,g,b,alpha)
+                    color = mixer.color(prev, bounce)
 
-                    # Packa koordinater + metadata
                     xs = [e[0] for e in entries]
                     ys = [e[1] for e in entries]
                     zs = [e[2] for e in entries]
-                    infos = [e[3] for e in entries]  # dict med ray/id/prev/bounce
-                    energies = [e[4] for e in entries]  # OBS: energy ligger på index 4
+                    infos = [e[3] for e in entries]
+                    energies = [e[4] for e in entries]
 
-                    if is3d:
-                        sc = ax.scatter(xs, ys, zs, marker=marker, color=color, s=40)
+                    if cfg.is3d:
+                        sc = ax.scatter(
+                            xs, ys, zs, marker=marker, color=color, s=SCATTER_SIZE
+                        )
                     else:
-                        px, py = (ys, xs) if flip else (xs, ys)
-                        sc = ax.scatter(px, py, marker=marker, color=color, s=40)
+                        px, py = (ys, xs) if cfg.flip_2d_axes else (xs, ys)
+                        sc = ax.scatter(
+                            px, py, marker=marker, color=color, s=SCATTER_SIZE
+                        )
 
-                        # Spara för blobritning (2D)
-                        if show_blobs:
-                            group_points_2D.append((px, py, color, prev, bounce))
-
-                    # Klickbar + metadata för popups
+                    # click metadata
                     sc.set_picker(True)
                     sc._pointinfo = []
                     for i in range(len(entries)):
@@ -588,49 +572,71 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
 
                     scatter_artists.append(sc)
 
-        # ------------------------------------
-        # Soft convex hull blobs (2D only)
-        # ------------------------------------
-        if show_blobs and not is3d:
-            do_smooth = self.chkBlobSmooth.isChecked()
-            strength_val = self.spnBlobStrength.value()
+        return scatter_artists
 
-            for px, py, base_color, prev, bounce in group_points_2D:
-                if len(px) < 1:
-                    continue
+    def _draw_blobs(
+        self,
+        ax,
+        tree: RayTree,
+        ray_marker: Dict[str, str],  # not used, but kept for parity/extension
+        mixer: ColorMixer,
+        cfg: PlotConfig,
+    ):
+        """Draw soft convex-hull blobs per (ray, bounce, prev) group in 2D."""
+        # Accumulate per group to honor flip and per-group color
+        for ray, bounce_dict in tree.items():
+            cb = self._ray_checkboxes.get(ray)
+            if not cb or not cb.isChecked():
+                continue
 
-                # Colors
-                face_rgba = (base_color[0], base_color[1], base_color[2], 0.17)
-                edge_rgba = (base_color[0], base_color[1], base_color[2], 0.35)
+            for bounce, prev_dict in bounce_dict.items():
+                for prev, entries in prev_dict.items():
+                    color = mixer.color(prev, bounce)
+                    xs = [e[0] for e in entries]
+                    ys = [e[1] for e in entries]
 
-                # Step 1: convex hull
-                hull = convex_hull_2d(px, py)
-                if len(hull) < 3:
-                    # fallback för 1–2 punkter
-                    continue
+                    if cfg.flip_2d_axes:
+                        px, py = ys, xs
+                    else:
+                        px, py = xs, ys
 
-                # Step 2: offset
-                if do_smooth:
-                    hull2 = offset_polygon_adaptive(hull, strength=strength_val)
-                    # Step 3: smoothing
-                    smooth = smooth_polygon(hull2, iterations=4)
-                    poly_pts = smooth
-                else:
-                    # raw hull only
-                    poly_pts = hull
+                    if len(px) < 1:
+                        continue
 
-                # Step 4: draw blob polygon
-                poly = Polygon(
-                    poly_pts,
-                    closed=True,
-                    facecolor=face_rgba,
-                    edgecolor=edge_rgba,
-                    linewidth=1.3,
-                )
-                ax.add_patch(poly)
+                    face_rgba = (color[0], color[1], color[2], BLOB_FACE_ALPHA)
+                    edge_rgba = (color[0], color[1], color[2], BLOB_EDGE_ALPHA)
 
-        # 7) Legender (under plotten, tre block)
-        # Ray (marker)
+                    hull = convex_hull_2d(px, py)
+                    if len(hull) < 3:
+                        continue
+
+                    if cfg.smooth_blobs:
+                        hull2 = offset_polygon_adaptive(
+                            hull, strength=cfg.blob_strength
+                        )
+                        poly_pts = smooth_polygon(hull2, iterations=4)
+                    else:
+                        poly_pts = hull
+
+                    poly = Polygon(
+                        poly_pts,
+                        closed=True,
+                        facecolor=face_rgba,
+                        edgecolor=edge_rgba,
+                        linewidth=BLOB_EDGE_LINEWIDTH,
+                    )
+                    ax.add_patch(poly)
+
+    def _build_legends(
+        self,
+        ax_leg,
+        rays: List[str],
+        prevs: List[Any],
+        mixer: ColorMixer,
+        bounces: List[Any],
+        ray_marker: Dict[str, str],
+    ):
+        # Ray legend (marker)
         ray_handles = [
             Line2D(
                 [0],
@@ -653,14 +659,14 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
         )
         ax_leg.add_artist(leg1)
 
-        # PreviousHit (R)
+        # PreviousHit (alpha indicated by red-ish intensity)
         prev_handles = [
             Line2D(
                 [0],
                 [0],
                 marker="o",
                 linestyle="None",
-                color=(prev_scale[p], 0.1, 0.1, 0.6),
+                color=(mixer.prev_scale[p], 0.1, 0.1, 0.6),
                 markersize=8,
                 label=str(p),
             )
@@ -677,19 +683,13 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
         )
         ax_leg.add_artist(leg2)
 
-        import matplotlib.cm as cm
-
-        bounce_cmap = cm.get_cmap("plasma")
-
+        # Bounce (plasma colormap)
         bounce_list = sorted(bounces)
         max_index = max(len(bounce_list) - 1, 1)
-
         bounce_handles = []
-
         for i, b in enumerate(bounce_list):
             t = i / max_index
-            r, g, bb, _ = bounce_cmap(t)
-
+            r, g, bb, _ = cm.get_cmap("plasma")(t)
             bounce_handles.append(
                 Line2D(
                     [0],
@@ -701,8 +701,7 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
                     label=f"Bounce {b}",
                 )
             )
-
-        leg3 = ax_leg.legend(
+        ax_leg.legend(
             handles=bounce_handles,
             labels=[h.get_label() for h in bounce_handles],
             title="BounceCnt (B)",
@@ -711,13 +710,28 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
             frameon=True,
         )
 
-        # 8) Klick-hanterare: highlight av grupp + popup
+    # ------------------------------------------------------------- Pick/Popup
+
+    def _install_pick_handler(self, scatter_artists: List[Any]):
+        # Remove previous handler to avoid duplicates on reload
+        if self._pick_cid is not None:
+            try:
+                self.fig.canvas.mpl_disconnect(self._pick_cid)
+            except Exception:
+                pass
+            self._pick_cid = None
+
         def on_pick(event):
             artist = event.artist
+            if not hasattr(artist, "_pointinfo"):
+                return
+            if not event.ind:
+                return
+
             idx = event.ind[0]
             info = artist._pointinfo[idx]
 
-            # Avmarkera tidigare highlight
+            # Un-highlight previous
             if self._highlighted_scatter is not None:
                 try:
                     self._highlighted_scatter.set_edgecolors("none")
@@ -725,29 +739,26 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
                 except Exception:
                     pass
 
-            # Highlighta denna grupp
+            # Highlight current
             try:
-                artist.set_edgecolors("yellow")
-                artist.set_linewidths(2.3)
+                artist.set_edgecolors(HOVER_EDGECOLOR)
+                artist.set_linewidths(HOVER_LINEWIDTH)
             except Exception as e:
                 print("Highlight error:", e)
 
             self._highlighted_scatter = artist
 
-            # Visa popup
-            self.show_point_popup(info)
+            # Show popup
+            self._show_point_popup(info)
 
             self.canvas.draw_idle()
 
-        self.fig.canvas.mpl_connect("pick_event", on_pick)
-
-        # 9) Rendera
-        self.canvas.draw_idle()
+        self._pick_cid = self.fig.canvas.mpl_connect("pick_event", on_pick)
 
 
-# -------------------------------------------------------
-# SHOW DIALOG
-# -------------------------------------------------------
+# =============================================================================
+# Public API
+# =============================================================================
 
 
 def RH_ShowAdvancedPlot():
@@ -760,9 +771,9 @@ def RH_ShowAdvancedPlot():
     return dlg
 
 
-# -------------------------------------------------------
-# REGISTER FREECAD COMMAND
-# -------------------------------------------------------
+# =============================================================================
+# FreeCAD Command Registration
+# =============================================================================
 
 
 class Rayhits_PlotCmd:
