@@ -1,188 +1,92 @@
-# rayhits_parser.py
+# -*- coding: utf-8 -*-
+# sa_rayhits_parser.py
+#
+# Bygger både datastruktur ("tree") och sammanställd gruppstatistik ("stats").
+#
+# TREE:
+# tree[absorber][ray][bounce][prev] = [
+#     {
+#         "id": int,                     # original Id per träff
+#         "x": float, "y": float, "z": float,
+#         "energy": float|None,
+#         "coords": {                    # färdiga projektioner för plotting
+#             "XY": (x, y),
+#             "XZ": (x, z),
+#             "YZ": (y, z),
+#             "3D": (x, y, z)
+#         },
+#         "prev": prev,
+#         "bounce": bounce,
+#         "ray": ray,
+#         "absorber": absorber,
+#         "info": dict|None,             # tolkad rayinfo
+#         "sort_index": int,             # radindex från arket (bevarar ordning)
+#         "group_id": (absorber, ray, bounce, prev)  # STABILT unikt grupp-ID (tuple)
+#     },
+#     ...
+# ]
+#
+# STATS:
+# stats[group_id] = {
+#     "group_id": (absorber, ray, bounce, prev),
+#     "absorber": absorber,
+#     "ray": ray,
+#     "bounce": bounce,
+#     "prev": prev,
+#     "count": int,
+#     "centroid": {                     # oviktade centroider
+#         "XY": (cx, cy),
+#         "XZ": (cx, cz),
+#         "YZ": (cy, cz),
+#         "3D": (cx, cy, cz),
+#     },
+#     # Följande nycklar läggs ENDAST till om compute_weighted_3d=True:
+#     # "centroid_weighted_3D": (wx, wy, wz),
+#     # "centroid_weighted": {
+#     #     "XY": (wx, wy),
+#     #     "XZ": (wx, wz),
+#     #     "YZ": (wy, wz),
+#     # },
+#     "first_index": int,               # min sort_index i gruppen
+#     "last_index": int,                # max sort_index i gruppen
+# }
+#
+# Topp-funktion:
+#     get_tree_and_stats_for_sheet(sheet_name, doc=None, compute_weighted_3d=False)
+# → Returnerar (tree, stats)
+#
+# -----------------------------------------------------------------------------
+
+# Use case:
+
+# from sa_rayhits_parser import get_tree_and_stats_for_sheet
+
+# tree, stats = get_tree_and_stats_for_sheet("RayHits_Mirror003", compute_weighted_3d=False)
+
+# # Exempel: iterera grupper
+# for absorber, ray_dict in tree.items():
+#     for ray, bounce_dict in ray_dict.items():
+#         for bounce, prev_dict in bounce_dict.items():
+#             for prev, entries in prev_dict.items():
+#                 gid = (absorber, ray, bounce, prev)
+#                 group_info = stats.get(gid, {})
+#                 print(gid, "count:", group_info.get("count"), "centroid 2D XY:", group_info.get("centroid", {}).get("XY"))
+# -----------------------------------------------------------------------------
+
+
+from __future__ import annotations
 
 from collections import defaultdict
+from typing import Any, Dict, List, Tuple, Optional
 
 
-# NEW STRUCTURE:
-# data[ray][bounceCnt][previousHit] = list of points
-
-
-# Ray
-#  ├── BounceCount = 0
-#  │     ├── PrevHit = A
-#  │     └── PrevHit = B
-#  ├── BounceCount = 1
-#  │     ├── PrevHit = A
-#  │     └── PrevHit = B
-#  └── BounceCount = 2
-#    ├── PrevHit = A
-#    └── PrevHit = B
-
-
-def parse_rayinfo(cell):
-    if not isinstance(cell, str):
-        return None
-
-    parts = {}
-    for p in cell.split(";"):
-        if "=" in p:
-            k, v = p.split("=", 1)
-            parts[k.strip()] = v.strip()
-
-    try:
-        return {
-            "ray": parts.get("sa_Ray"),
-            "id": int(parts["Id"]) if "Id" in parts else None,
-            "prev": parts.get("PreviousHit"),
-            "bounce": int(parts["BounceCnt"]) if "BounceCnt" in parts else None,
-        }
-    except:
-        return None
-
-
-def read_sheet_rows(sheet):
-    rows = []
-    r = 2
-
-    while True:
-        try:
-            a = sheet.get(f"A{r}")
-        except:
-            break
-
-        if not a:
-            break
-
-        info = parse_rayinfo(sheet.get(f"B{r}"))
-
-        try:
-            x = float(sheet.get(f"C{r}"))
-            y = float(sheet.get(f"D{r}"))
-            z = float(sheet.get(f"E{r}"))
-        except:
-            r += 1
-            continue
-
-        try:
-            en = float(sheet.get(f"F{r}"))
-        except:
-            en = None
-
-        rows.append((x, y, z, info, en))
-        r += 1
-
-    return rows
-
-
-def build_ray_tree(rows):
+# -------------------------------------------------------------
+# Hjälpare: hitta sheet efter Name eller Label (case-insensitive)
+# -------------------------------------------------------------
+def _find_sheet_by_name_or_label(sheet_name: str, doc=None):
     """
-    Returns:
-
-    data[ray][bounceCnt][previousHit] = [points]
-    """
-
-    data = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-
-    for x, y, z, info, en in rows:
-        if not info:
-            continue
-
-        ray = info["ray"]
-        bounce = info["bounce"]
-        prev = info["prev"]
-
-        data[ray][bounce][prev].append((x, y, z, info, en))
-
-    return data
-
-
-#
-#
-# Bygg en struktur som grupperar alla träffar per Ray, och där varje träff har en unik ID-nyckel.
-# För varje grupp (Ray + BounceCount + PreviousHit) beräknas ett "group_center" och "group_extent" (maxavstånd från center).
-#
-
-
-def build_ray_groups_by_id(rows):
-    """
-    Returns structure grouped by Ray, with unique ID keys:
-
-    {
-      ray_name : {
-         id : {
-            "x": float, "y": float, "z": float,
-            "energy": float|None,
-            "prev": str|None,
-            "bounce": int|None,
-            "ray": str|None,
-            "info": dict|None,
-            "group_center": (cx, cy, cz),
-            "group_extent": float,
-            "is_outlier": bool
-         },
-         ...
-      }
-    }
-    """
-    import math
-
-    tree = build_ray_tree(rows)
-    out = {}
-
-    for ray, bdict in tree.items():
-        out[ray] = {}
-
-        for bounce, pdict in bdict.items():
-            for prev, entries in pdict.items():
-
-                xs = [e[0] for e in entries]
-                ys = [e[1] for e in entries]
-                zs = [e[2] for e in entries]
-
-                if len(xs) >= 1:
-                    cx = sum(xs) / len(xs)
-                    cy = sum(ys) / len(ys)
-                    cz = sum(zs) / len(zs)
-                else:
-                    cx = cy = cz = 0.0
-
-                dmax = 0.0
-                for x, y, z in zip(xs, ys, zs):
-                    dx = x - cx
-                    dy = y - cy
-                    dz = z - cz
-                    dist = math.sqrt(dx * dx + dy * dy + dz * dz)
-                    dmax = max(dmax, dist)
-
-                # Enkel spridnings‑heuristik → "är gruppen utspretad?"
-                is_outlier = dmax > 3.5 * (dmax / len(xs) if len(xs) > 1 else 0.1)
-
-                for x, y, z, info, en in entries:
-                    pid = info.get("id") if isinstance(info, dict) else None
-                    if pid is None:
-                        # Fallback om Id saknas: syntetisk, men stabil för sessionen
-                        pid = id(info)
-
-                    out[ray][pid] = {
-                        "x": x,
-                        "y": y,
-                        "z": z,
-                        "energy": en,
-                        "prev": prev,
-                        "bounce": bounce,
-                        "ray": ray,
-                        "info": info,
-                        "group_center": (cx, cy, cz),
-                        "group_extent": dmax,
-                        "is_outlier": is_outlier,
-                    }
-
-    return out
-
-
-def _find_sheet_by_name_or_label(sheet_name, doc=None):
-    """
-    Return a Spreadsheet::Sheet by Name or Label (case-insensitive).
+    Returnerar Spreadsheet::Sheet efter Name eller Label (case-insensitive).
+    Stöttar även "börjar med" om exakt träff saknas.
     """
     try:
         import FreeCAD as App
@@ -204,8 +108,8 @@ def _find_sheet_by_name_or_label(sheet_name, doc=None):
     if obj and obj.isDerivedFrom("Spreadsheet::Sheet"):
         return obj
 
-    # 2) Sök via Name/Label (case-insensitive)
-    for o in doc.Objects:
+    # 2) Sök via Name/Label (exakt, case-insensitive)
+    for o in getattr(doc, "Objects", []):
         try:
             if not o.isDerivedFrom("Spreadsheet::Sheet"):
                 continue
@@ -216,8 +120,8 @@ def _find_sheet_by_name_or_label(sheet_name, doc=None):
         except Exception:
             continue
 
-    # 3) Ingen exakt träff → försök "börjar med"
-    for o in doc.Objects:
+    # 3) "Börjar med" om exakt träff saknas
+    for o in getattr(doc, "Objects", []):
         try:
             if not o.isDerivedFrom("Spreadsheet::Sheet"):
                 continue
@@ -231,29 +135,217 @@ def _find_sheet_by_name_or_label(sheet_name, doc=None):
     raise LookupError(f"Spreadsheet '{sheet_name}' not found (by Name or Label).")
 
 
-def build_ray_groups_by_id_for_sheet(sheet_name, skip_outlier_groups=False, doc=None):
-    """
-    Convenience wrapper: read rows from sheet (by name/label), then build Ray->ID structure.
+# -------------------------------------------------------------
+# Parse RayInfo-string: "sa_Ray=Beam;Id=1;PreviousHit=A;BounceCnt=2"
+# -------------------------------------------------------------
+def parse_rayinfo(cell: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(cell, str):
+        return None
 
-    :param sheet_name: Name or Label of the Spreadsheet::Sheet
-    :param skip_outlier_groups: if True, drop IDs that belong to groups flagged as outlier
-    :param doc: optional FreeCAD document; defaults to App.ActiveDocument
-    :return: dict[ray][id] -> point/meta info
+    parts: Dict[str, str] = {}
+    for p in cell.split(";"):
+        if "=" in p:
+            k, v = p.split("=", 1)
+            parts[k.strip()] = v.strip()
+
+    try:
+        return {
+            "ray": parts.get("sa_Ray"),
+            "id": int(parts["Id"]) if "Id" in parts else None,
+            "prev": parts.get("PreviousHit"),
+            "bounce": int(parts["BounceCnt"]) if "BounceCnt" in parts else None,
+        }
+    except Exception:
+        return None
+
+
+# -------------------------------------------------------------
+# Läs data-rader ur sheet → list of (absorber, x,y,z, info, energy, row_index)
+# -------------------------------------------------------------
+def read_sheet_rows(
+    sheet,
+) -> List[Tuple[Any, float, float, float, dict, Optional[float], int]]:
+    rows: List[Tuple[Any, float, float, float, dict, Optional[float], int]] = []
+    r = 2  # hoppa header (rad 1)
+
+    while True:
+        try:
+            absorber = sheet.get(f"A{r}")
+        except Exception:
+            break
+
+        if not absorber:
+            break
+
+        info = parse_rayinfo(sheet.get(f"B{r}"))
+
+        try:
+            x = float(sheet.get(f"C{r}"))
+            y = float(sheet.get(f"D{r}"))
+            z = float(sheet.get(f"E{r}"))
+        except Exception:
+            r += 1
+            continue
+
+        try:
+            en = float(sheet.get(f"F{r}"))
+        except Exception:
+            en = None
+
+        rows.append((absorber, x, y, z, info, en, r))
+        r += 1
+
+    return rows
+
+
+# -------------------------------------------------------------
+# Bygg TREE: absorber → ray → bounce → prev → entries[]
+#  + lägg till stabilt group_id (tuple) på varje entry
+# -------------------------------------------------------------
+def build_ray_tree(rows):
+    """
+    Skapar hierarki och bevarar radordning via 'sort_index'.
+    Lägger till 'group_id' = (absorber, ray, bounce, prev) på varje entry.
+    """
+    data = defaultdict(  # absorber
+        lambda: defaultdict(  # ray
+            lambda: defaultdict(  # bounce
+                lambda: defaultdict(list)  # prev -> [entries]
+            )
+        )
+    )
+
+    for absorber, x, y, z, info, en, row_idx in rows:
+        if not info:
+            continue
+
+        ray = info["ray"]
+        pid = info["id"]
+        prev = info["prev"]
+        bounce = info["bounce"]
+
+        group_id = (absorber, ray, bounce, prev)  # STABILT unikt grupp-ID
+
+        coords = {
+            "XY": (x, y),
+            "XZ": (x, z),
+            "YZ": (y, z),
+            "3D": (x, y, z),
+        }
+
+        entry = {
+            "id": pid,
+            "x": x,
+            "y": y,
+            "z": z,
+            "energy": en,
+            "coords": coords,
+            "prev": prev,
+            "bounce": bounce,
+            "ray": ray,
+            "absorber": absorber,
+            "info": info,
+            "sort_index": row_idx,
+            "group_id": group_id,
+        }
+
+        data[absorber][ray][bounce][prev].append(entry)
+
+    return data
+
+
+# -------------------------------------------------------------
+# Bygg STATS per grupp:
+#  - samma group_id (tuple) som på entries
+#  - oviktade centroider i XY/XZ/YZ/3D alltid
+#  - (valfritt) energiviktad 3D-centroid med projicerade planvärden
+# -------------------------------------------------------------
+def build_group_stats(tree, compute_weighted_3d: bool = False):
+    stats: Dict[Tuple[Any, Any, Any, Any], Dict[str, Any]] = {}
+
+    for absorber, ray_dict in tree.items():
+        for ray, bounce_dict in ray_dict.items():
+            for bounce, prev_dict in bounce_dict.items():
+                for prev, entries in prev_dict.items():
+                    if not entries:
+                        continue
+
+                    group_id = (absorber, ray, bounce, prev)
+                    count = len(entries)
+
+                    # Oviktade medel
+                    sum_x = sum(e["x"] for e in entries)
+                    sum_y = sum(e["y"] for e in entries)
+                    sum_z = sum(e["z"] for e in entries)
+                    cx = sum_x / count
+                    cy = sum_y / count
+                    cz = sum_z / count
+
+                    first_idx = min(e.get("sort_index", 10**9) for e in entries)
+                    last_idx = max(e.get("sort_index", -(10**9)) for e in entries)
+
+                    stat = {
+                        "group_id": group_id,
+                        "absorber": absorber,
+                        "ray": ray,
+                        "bounce": bounce,
+                        "prev": prev,
+                        "count": count,
+                        "centroid": {
+                            "XY": (cx, cy),
+                            "XZ": (cx, cz),
+                            "YZ": (cy, cz),
+                            "3D": (cx, cy, cz),
+                        },
+                        "first_index": first_idx,
+                        "last_index": last_idx,
+                    }
+
+                    # Valfritt: energiviktad 3D-centroid + projicerade plan
+                    if compute_weighted_3d:
+                        total_w = 0.0
+                        wx = wy = wz = 0.0
+                        for e in entries:
+                            w = e["energy"] if e["energy"] is not None else 1.0
+                            wx += e["x"] * w
+                            wy += e["y"] * w
+                            wz += e["z"] * w
+                            total_w += w
+                        if total_w > 0:
+                            wx /= total_w
+                            wy /= total_w
+                            wz /= total_w
+                        else:
+                            wx, wy, wz = cx, cy, cz
+
+                        stat["centroid_weighted_3D"] = (wx, wy, wz)
+                        stat["centroid_weighted"] = {
+                            "XY": (wx, wy),
+                            "XZ": (wx, wz),
+                            "YZ": (wy, wz),
+                        }
+
+                    stats[group_id] = stat
+
+    return stats
+
+
+# -------------------------------------------------------------
+# TOPP-FUNKTION: ta sheetname och returnera (tree, stats)
+# -------------------------------------------------------------
+def get_tree_and_stats_for_sheet(
+    sheet_name: str, doc=None, compute_weighted_3d: bool = False
+):
+    """
+    :param sheet_name: Name eller Label för Spreadsheet::Sheet (case-insensitive)
+    :param doc: FreeCAD-dokument (default App.ActiveDocument)
+    :param compute_weighted_3d: om True, lägg till energiviktade centroider i stats
+    :return: (tree, stats)
+             tree  = data[absorber][ray][bounce][prev] = [entry, ...]
+             stats = dict[group_id(tuple)] -> stat-dict
     """
     sheet = _find_sheet_by_name_or_label(sheet_name, doc=doc)
     rows = read_sheet_rows(sheet)
-    by_id = build_ray_groups_by_id(rows)
-
-    if not skip_outlier_groups:
-        return by_id
-
-    # Filtrera bort alla id-poster vars grupp markerats som outlier
-    filtered = {}
-    for ray, idmap in by_id.items():
-        keep = {
-            pid: pdata
-            for pid, pdata in idmap.items()
-            if not pdata.get("is_outlier", False)
-        }
-        filtered[ray] = keep
-    return filtered
+    tree = build_ray_tree(rows)
+    stats = build_group_stats(tree, compute_weighted_3d=compute_weighted_3d)
+    return tree, stats
