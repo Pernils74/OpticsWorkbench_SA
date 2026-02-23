@@ -1,19 +1,37 @@
 {
+  // ===== Allmänt =====
   "editor.formatOnSave": true,
+  // (valfritt) kör bara default formatter på save, inte extra formatters
+  // "editor.formatOnSaveMode": "file",
 
-  // Python använder Black-formatteraren (nytt sätt)
+  // Kolumn-guider och wrap
+  "editor.wordWrapColumn": 160,
+  "editor.rulers": [160],
+
+  // HTML wrap
+  "html.format.wrapLineLength": 180,
+
+  // ===== Python (Black) =====
   "[python]": {
     "editor.defaultFormatter": "ms-python.black-formatter"
   },
-
-  // Black: sätt radlängden
+  // Black-argument
   "black-formatter.args": ["--line-length", "250"],
 
-  // (valfritt) formatera bara ändrade rader vid save
-  // "editor.formatOnSaveMode": "modifications",
-
+  // Stäng av Type Checking (Pylance)
   "python.analysis.typeCheckingMode": "off",
-  "html.format.wrapLineLength": 180,
-  "editor.wordWrapColumn": 160,
-  "editor.rulers": [160]
+
+  // ===== JSON/JSONC (Prettier) =====
+  // Se till att Prettier används för JSON och JSONC
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  // Prettier-inställningar (globalt)
+  // (Används för bl.a. JSON/JSONC; Python påverkas inte av detta eftersom Black tar över där.)
+  "prettier.printWidth": 160,
+  "prettier.proseWrap": "preserve"
 }
