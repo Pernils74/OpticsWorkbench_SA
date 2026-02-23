@@ -30,6 +30,7 @@ class OpticsWorkbench_SA(Workbench):
         """This function is executed when FreeCAD starts"""
         # import here all the needed files that create your FreeCAD commands
         import sa_Ray
+        import sa_Plot
         import sa_OpticalObject
         import rayhits_plot
         import sa_LiveSheets
