@@ -12,7 +12,6 @@ import FreeCADGui as Gui
 from PySide import QtWidgets
 from PySide.QtCore import Qt, QEvent
 
-
 import matplotlib
 
 try:
@@ -38,7 +37,7 @@ from sa_plot.sa_plot_core import (
     compute_domains_for_legend,
 )
 
-MARKERS = ["o", "s", "^", "D", "P", "*", "x", "v", "<", ">"]
+MARKERS = ["o", "s", "^", "D", "P", "*", "x", "v", "<", ">"]  # <<< fixat "<", ">"
 DEFAULT_FIGSIZE = (10, 7)
 SCATTER_SIZE = 40
 
@@ -63,7 +62,7 @@ class PlotConfig:
     show_weighted_centroids: bool  # om parsern levererar viktade (kan vara False initialt)
 
     @property
-    def is3d(self) -> bool:
+    def is3d(self) -> bool:  # <<< fix: "->" istället för "&gt;"
         return self.plane_text.startswith("XYZ")
 
 
@@ -76,13 +75,12 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
         flags |= Qt.WindowSystemMenuHint
         flags |= Qt.WindowMinimizeButtonHint
         flags |= Qt.WindowMaximizeButtonHint
-        # (valfritt) se till att den inte är "Tool" (som saknar normal titelradbeteende)
         flags |= Qt.Window
         self.setWindowFlags(flags)
 
         # --- Säkerställ att den går att ändra storlek på ---
-        self.setSizeGripEnabled(True)  # QDialog-specifik hjälp
-        self.setMinimumSize(640, 480)  # ge rimlig minsta storlek
+        self.setSizeGripEnabled(True)
+        self.setMinimumSize(640, 480)
 
         self.setWindowTitle("RayHits Advanced Plot")
         self.resize(1400, 900)
@@ -93,16 +91,47 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
         self._highlighted_scatter = None
         self._pick_cid: Optional[int] = None
 
+        # Referenser till scroll/inner för höjd-kapning
+        self.absorberScroll = None
+        self.absorberInner = None
+        self.rayScroll = None
+        self.rayInner = None
+
         self._init_ui()
         self._connect_signals()
 
         self.populate_sheets()
         self.reload_plot()
 
+    # ---------------- Helpers (layout/auto-height) ----------------
+    def _cap_panel_height(self, scroll: QtWidgets.QScrollArea, inner: QtWidgets.QWidget, max_rows: int = 6):
+        """
+        Sätter en rimlig maxhöjd på scroll-arean baserat på innerhållets sizeHint,
+        men kapar så att ca 'max_rows' checkbox-rader syns innan scroll behövs.
+        """
+        if not (scroll and inner):
+            return
+        sh = inner.sizeHint()
+        if sh.isValid():
+            # uppskatta radhöjd
+            checks = inner.findChildren(QtWidgets.QCheckBox)
+            n = max(1, len(checks))
+            row_h = max(18, int(sh.height() / n))  # min 18 px
+            max_h = int(max_rows * row_h + 2 * 8)  # + marginaler
+            scroll.setMaximumHeight(min(sh.height(), max_h))
+        else:
+            scroll.setMaximumHeight(160)
+
+    @staticmethod
+    def _is_mirror_name(name: str) -> bool:
+        n = (name or "").lower()
+        return "mirror" in n
+
     # ---------------- UI ----------------
     def _init_ui(self):
         root = QtWidgets.QVBoxLayout(self)
 
+        # --- Top rad: källval + kontroller ---
         top = QtWidgets.QHBoxLayout()
         root.addLayout(top)
 
@@ -114,7 +143,7 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
         btnReload.clicked.connect(self.reload_plot)
         top.addWidget(btnReload)
 
-        # +++ NEW: Export-knapp +++
+        # Export-knapp
         self.btnExport = QtWidgets.QPushButton("Export Stats")
         self.btnExport.setToolTip("Export group stats to a new spreadsheet (prefix from the selected sheet)")
         self.btnExport.clicked.connect(self.on_export_stats)
@@ -153,29 +182,53 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
         self.spnBlobStrength.setValue(0.15)
         top.addWidget(self.spnBlobStrength)
 
-        # NEW: centroid toggle(s)
         self.chkCentroids = QtWidgets.QCheckBox("Show centroids")
         self.chkCentroids.setChecked(True)
         top.addWidget(self.chkCentroids)
 
-        # (valfritt) en ytterligare toggle om du aktiverar viktade i parsern:
         self.chkCentroidsWeighted = QtWidgets.QCheckBox("Energy-weighted 3D centroids")
         self.chkCentroidsWeighted.setChecked(False)
         top.addWidget(self.chkCentroidsWeighted)
 
         top.addStretch()
 
-        # Absorber checkboxes
-        self.absorberBox = QtWidgets.QGroupBox("Visible Absorbers")
-        self.absorberLayout = QtWidgets.QVBoxLayout(self.absorberBox)
-        root.addWidget(self.absorberBox)
+        # --- Två paneler sida vid sida: auto-kompakt höjd med scroll-areas ---
+        row_boxes = QtWidgets.QHBoxLayout()
+        root.addLayout(row_boxes)
 
-        # Ray checkboxes
-        self.rayBox = QtWidgets.QGroupBox("Visible Rays")
-        self.rayLayout = QtWidgets.QVBoxLayout(self.rayBox)
-        root.addWidget(self.rayBox)
+        def make_compact_groupbox(title: str):
+            box = QtWidgets.QGroupBox(title)
 
-        # Figure
+            # Inre widget + layout (checkboxar placeras här)
+            inner = QtWidgets.QWidget()
+            layout = QtWidgets.QVBoxLayout(inner)
+            layout.setSpacing(3)
+            layout.setContentsMargins(6, 6, 6, 6)
+
+            # Scroll area
+            scroll = QtWidgets.QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            scroll.setWidget(inner)
+            scroll.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Maximum)
+
+            # Lägg scroll i groupbox
+            v = QtWidgets.QVBoxLayout(box)
+            v.setContentsMargins(6, 12, 6, 6)
+            v.addWidget(scroll)
+
+            return box, scroll, inner, layout
+
+        # Vänster: Absorbers (Mirrors)
+        self.absorberBox, self.absorberScroll, self.absorberInner, self.absorberLayout = make_compact_groupbox("Visible absorbers")
+        row_boxes.addWidget(self.absorberBox, 1)
+
+        # Höger: Rays
+        self.rayBox, self.rayScroll, self.rayInner, self.rayLayout = make_compact_groupbox("Visible rays")
+        row_boxes.addWidget(self.rayBox, 1)
+
+        # --- Plot ---
         self.fig = plt.Figure(figsize=DEFAULT_FIGSIZE)
         self.canvas = FigureCanvas(self.fig)
         self.toolbar = NavigationToolbar(self.canvas, self)
@@ -185,6 +238,12 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
         # Status
         self.lblStatus = QtWidgets.QLabel("")
         root.addWidget(self.lblStatus)
+
+        # Ge plotten större stretch än panelerna (visuellt prioriterad höjd)
+        # Index: 0=top, 1=row_boxes, 2=toolbar, 3=canvas, 4=status
+        root.setStretch(1, 0)  # panelrad
+        root.setStretch(2, 0)  # toolbar
+        root.setStretch(3, 1)  # canvas (plot)
 
     def _connect_signals(self):
         widgets = [
@@ -226,35 +285,62 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
             self.cmbSheet.addItem(s.Label or s.Name)
         self.cmbSheet.blockSignals(False)
 
-    def current_sheet_name(self) -> Optional[str]:
+    def current_sheet_name(self) -> Optional[str]:  # <<< fix: "->"
         return self.cmbSheet.currentText() or None
 
     # ---------------- Checkbox builders ----------------
     def _rebuild_absorber_checkboxes(self, tree):
+        # Rensa gamla
         for cb in self.absorber_checkboxes.values():
             self.absorberLayout.removeWidget(cb)
             cb.deleteLater()
         self.absorber_checkboxes.clear()
 
-        for absorber in sorted(tree.keys()):
-            cb = QtWidgets.QCheckBox(absorber)
+        # Filtrera till Mirrors (OpticalType == "mirror"), fallback: namn-heuristik
+        doc = App.ActiveDocument
+        absorber_names = sorted(tree.keys())
+
+        only_mirrors = []
+        for absorber in absorber_names:
+            is_mirror = False
+            if doc:
+                obj = doc.getObject(str(absorber))
+                if obj and hasattr(obj, "OpticalType"):
+                    is_mirror = obj.OpticalType == "mirror"
+            if not is_mirror:
+                is_mirror = self._is_mirror_name(str(absorber))
+            if is_mirror:
+                only_mirrors.append(absorber)
+
+        # Lägg in checkboxar i VLayout (rader)
+        for absorber in only_mirrors:
+            cb = QtWidgets.QCheckBox(str(absorber))
             cb.setChecked(True)
             cb.stateChanged.connect(self.reload_plot)
             self.absorberLayout.addWidget(cb)
             self.absorber_checkboxes[absorber] = cb
 
+        self.absorberLayout.addStretch(1)
+        # Auto-kapa höjd efter uppbyggnad
+        self._cap_panel_height(self.absorberScroll, self.absorberInner, max_rows=6)
+
     def _rebuild_ray_checkboxes(self, rays_all):
+        # Rensa gamla
         for cb in self.ray_checkboxes.values():
             self.rayLayout.removeWidget(cb)
             cb.deleteLater()
         self.ray_checkboxes.clear()
 
         for ray in sorted(rays_all):
-            cb = QtWidgets.QCheckBox(ray)
+            cb = QtWidgets.QCheckBox(str(ray))
             cb.setChecked(True)
             cb.stateChanged.connect(self.reload_plot)
             self.rayLayout.addWidget(cb)
             self.ray_checkboxes[ray] = cb
+
+        self.rayLayout.addStretch(1)
+        # Auto-kapa höjd
+        self._cap_panel_height(self.rayScroll, self.rayInner, max_rows=6)
 
     # ---------------- Popup ----------------
     def _show_point_popup(self, info: Dict[str, Any]):
@@ -345,7 +431,7 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
                 ray_on=ray_on,
                 ray_marker=ray_marker,
                 mixer=mixer,
-                scatter_size=40,
+                scatter_size=SCATTER_SIZE,
             )
 
             # Blobs
@@ -360,13 +446,12 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
                     mixer=mixer,
                     smooth=cfg.smooth_blobs,
                     strength=cfg.blob_strength,
-                    face_alpha=0.17,
-                    edge_alpha=0.35,
-                    lw=1.3,
+                    face_alpha=BLOB_FACE_ALPHA,
+                    edge_alpha=BLOB_EDGE_ALPHA,
+                    lw=BLOB_EDGE_LINEWIDTH,
                 )
 
             # Centroids
-
             if cfg.show_centroids:
                 draw_centroids(
                     ax=ax,
@@ -391,19 +476,18 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
 
             self.canvas.draw_idle()
 
+            # Kapa panelhöjder igen (om t.ex. fönstret ändrats)
+            self._cap_panel_height(self.absorberScroll, self.absorberInner, max_rows=6)
+            self._cap_panel_height(self.rayScroll, self.rayInner, max_rows=6)
+
         except Exception as e:
             self.lblStatus.setText(f"Error: {e}")
             print("RayHitsPlotDialog.reload_plot error:", e)
 
     def on_export_stats(self):
-        """Exportera gruppnivå-statistik till nytt Spreadsheet-ark.
-
-        - Hämtar sheet-prefix från comboboxen
-        - Använder ev. 'Energy-weighted 3D centroids' (checkbox)
-        - Skapar t.ex. 'RayHits_Stats' (eller ..._Stats001 om upptaget)
-        """
+        """Exportera gruppnivå-statistik till nytt Spreadsheet-ark."""
         if export_group_stats_to_sheet is None:
-            QtWidgets.QMessageBox.critical(self, "Export unavailable", "export_group_stats_to_sheet(...) not found.\n" "Please ensure your sa_rayhits_parser.py contains the export function.")
+            QtWidgets.QMessageBox.critical(self, "Export unavailable", "export_group_stats_to_sheet(...) not found.\nPlease ensure your sa_rayhits_parser.py contains the export function.")
             return
 
         doc = App.ActiveDocument
@@ -422,10 +506,8 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
                 doc=doc,
                 compute_weighted_3d=self.chkCentroidsWeighted.isChecked(),
             )
-            # För säkerhets skull: recompute och uppdatera comboboxlistan
             doc.recompute()
 
-            # Markera/arbeta mot det nya bladet i comboboxen
             new_label = exported.Label or exported.Name
             idx = self.cmbSheet.findText(new_label)
             if idx >= 0:
