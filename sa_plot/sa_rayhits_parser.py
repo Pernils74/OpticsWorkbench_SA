@@ -207,13 +207,7 @@ def build_ray_tree(rows):
     Skapar hierarki och bevarar radordning via 'sort_index'.
     Lägger till 'group_id' = (absorber, ray, bounce, prev) på varje entry.
     """
-    data = defaultdict(  # absorber
-        lambda: defaultdict(  # ray
-            lambda: defaultdict(  # bounce
-                lambda: defaultdict(list)  # prev -> [entries]
-            )
-        )
-    )
+    data = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(list))))  # absorber  # ray  # bounce  # prev -> [entries]
 
     for absorber, x, y, z, info, en, row_idx in rows:
         if not info:
@@ -273,7 +267,7 @@ def build_group_stats(tree, compute_weighted_3d: bool = False):
                     group_id = (absorber, ray, bounce, prev)
                     count = len(entries)
 
-                    # Oviktade medel
+                    # Oviktade medel (centroid)
                     sum_x = sum(e["x"] for e in entries)
                     sum_y = sum(e["y"] for e in entries)
                     sum_z = sum(e["z"] for e in entries)
@@ -301,7 +295,50 @@ def build_group_stats(tree, compute_weighted_3d: bool = False):
                         "last_index": last_idx,
                     }
 
-                    # Valfritt: energiviktad 3D-centroid + projicerade plan
+                    # ----------------------------------------------------------------
+                    # 🔥 NYTT: Beräkna kluster-SPRIDNING (“spread”) i alla dimensioner
+                    # ----------------------------------------------------------------
+                    # Avstånd från centroid
+                    dx = [e["x"] - cx for e in entries]
+                    dy = [e["y"] - cy for e in entries]
+                    dz = [e["z"] - cz for e in entries]
+
+                    # Standardavvikelser
+                    import math
+
+                    std_x = math.sqrt(sum(d * d for d in dx) / count)
+                    std_y = math.sqrt(sum(d * d for d in dy) / count)
+                    std_z = math.sqrt(sum(d * d for d in dz) / count)
+
+                    # Maxradius i 3D (bra för densitets-score)
+                    radius_3d = max(math.sqrt(dx[i] ** 2 + dy[i] ** 2 + dz[i] ** 2) for i in range(count))
+
+                    # Maxradius i 2D-plan
+                    radius_xy = max(math.sqrt(dx[i] ** 2 + dy[i] ** 2) for i in range(count))
+                    radius_xz = max(math.sqrt(dx[i] ** 2 + dz[i] ** 2) for i in range(count))
+                    radius_yz = max(math.sqrt(dy[i] ** 2 + dz[i] ** 2) for i in range(count))
+
+                    # Kovarianser (oviktat)
+                    def cov(a, b):
+                        return sum(a[i] * b[i] for i in range(count)) / count
+
+                    stat["spread"] = {
+                        "XY": {"std": (std_x, std_y), "radius": radius_xy, "cov": [[cov(dx, dx), cov(dx, dy)], [cov(dy, dx), cov(dy, dy)]]},
+                        "XZ": {"std": (std_x, std_z), "radius": radius_xz, "cov": [[cov(dx, dx), cov(dx, dz)], [cov(dz, dx), cov(dz, dz)]]},
+                        "YZ": {"std": (std_y, std_z), "radius": radius_yz, "cov": [[cov(dy, dy), cov(dy, dz)], [cov(dz, dy), cov(dz, dz)]]},
+                        "3D": {
+                            "std": (std_x, std_y, std_z),
+                            "radius": radius_3d,
+                            "cov": [
+                                [cov(dx, dx), cov(dx, dy), cov(dx, dz)],
+                                [cov(dy, dx), cov(dy, dy), cov(dy, dz)],
+                                [cov(dz, dx), cov(dz, dy), cov(dz, dz)],
+                            ],
+                        },
+                    }
+                    # ----------------------------------------------------------------
+
+                    # (Din befintliga energiviktning lämnas orörd)
                     if compute_weighted_3d:
                         total_w = 0.0
                         wx = wy = wz = 0.0
@@ -311,6 +348,7 @@ def build_group_stats(tree, compute_weighted_3d: bool = False):
                             wy += e["y"] * w
                             wz += e["z"] * w
                             total_w += w
+
                         if total_w > 0:
                             wx /= total_w
                             wy /= total_w
@@ -333,9 +371,7 @@ def build_group_stats(tree, compute_weighted_3d: bool = False):
 # -------------------------------------------------------------
 # TOPP-FUNKTION: ta sheetname och returnera (tree, stats)
 # -------------------------------------------------------------
-def get_tree_and_stats_for_sheet(
-    sheet_name: str, doc=None, compute_weighted_3d: bool = False
-):
+def get_tree_and_stats_for_sheet(sheet_name: str, doc=None, compute_weighted_3d: bool = False):
     """
     :param sheet_name: Name eller Label för Spreadsheet::Sheet (case-insensitive)
     :param doc: FreeCAD-dokument (default App.ActiveDocument)
@@ -349,3 +385,133 @@ def get_tree_and_stats_for_sheet(
     tree = build_ray_tree(rows)
     stats = build_group_stats(tree, compute_weighted_3d=compute_weighted_3d)
     return tree, stats
+
+
+# -------------------------------------------------------------
+# EXPORT: skriv grupp-nivå "stats" till ett nytt Spreadsheet-blad
+# -------------------------------------------------------------
+def _unique_sheet_name(doc, base_name):
+    """Returnera ett ledigt namn som börjar på base_name, t.ex. 'RayHits_Stats', 'RayHits_Stats001', ..."""
+    existing = {o.Name for o in getattr(doc, "Objects", []) if o.isDerivedFrom("Spreadsheet::Sheet")}
+    if base_name not in existing:
+        return base_name
+    i = 1
+    while True:
+        cand = f"{base_name}{i:03d}"
+        if cand not in existing:
+            return cand
+        i += 1
+
+
+def export_group_stats_to_sheet(
+    sheet_name: str,
+    doc=None,
+    compute_weighted_3d: bool = False,
+    target_prefix: str | None = None,
+):
+    """
+    Läser radnivåblad 'sheet_name' (Name/Label eller prefix),
+    bygger (tree, stats) och skriver ett *kompakt* gruppblad:
+       <prefix>_Stats  (t.ex. 'RayHits_Stats')
+    Kolumner:
+       A: Absorber
+       B: Ray
+       C: Bounce
+       D: Previous
+       E: Count
+       F: Centroid_X
+       G: Centroid_Y
+       H: Centroid_Z
+       I: FirstIndex
+       J: LastIndex
+       K: Spread3D_Radius         (om spread finns)
+       L: Spread3D_StdX
+       M: Spread3D_StdY
+       N: Spread3D_StdZ
+    Returnerar det skapade Spreadsheet-objektet.
+    """
+    try:
+        import FreeCAD as App
+    except Exception as ex:
+        raise RuntimeError("FreeCAD is required for spreadsheet export") from ex
+
+    if doc is None:
+        doc = App.ActiveDocument
+    if doc is None:
+        raise RuntimeError("No active FreeCAD document")
+
+    # 1) Hämta tree + stats
+    tree, stats = get_tree_and_stats_for_sheet(sheet_name, doc=doc, compute_weighted_3d=compute_weighted_3d)
+
+    # 2) Bestäm prefix: om inte angivet → använd det användaren gav (trimma whitespace)
+    base = (target_prefix if target_prefix else sheet_name or "").strip()
+    if not base:
+        base = "RayHits"
+
+    # 3) Skapa nytt bladnamn som börjar på <prefix>_Stats
+    out_base = f"{base}_Stats"
+    out_name = _unique_sheet_name(doc, out_base)
+
+    # 4) Skapa blad
+    sheet_out = doc.addObject("Spreadsheet::Sheet", out_name)
+
+    # 5) Header
+    headers = [
+        ("A1", "Absorber"),
+        ("B1", "Ray"),
+        ("C1", "Bounce"),
+        ("D1", "Previous"),
+        ("E1", "Ray Count"),
+        ("F1", "Centroid_X"),
+        ("G1", "Centroid_Y"),
+        ("H1", "Centroid_Z"),
+        ("I1", "FirstIndex"),
+        ("J1", "LastIndex"),
+        ("K1", "Spread3D_Radius"),
+        ("L1", "Spread3D_StdX"),
+        ("M1", "Spread3D_StdY"),
+        ("N1", "Spread3D_StdZ"),
+    ]
+    for addr, text in headers:
+        sheet_out.set(addr, text)
+
+    # 6) Sortera grupper i samma ordning som dina rader (via first_index)
+    items = list(stats.items())
+    items.sort(key=lambda kv: kv[1].get("first_index", 10**9))
+
+    r = 2
+    for group_id, stat in items:
+        absorber, ray, bounce, prev = group_id
+        cnt = stat.get("count", 0)
+        cx, cy, cz = stat.get("centroid", {}).get("3D", (0.0, 0.0, 0.0))
+        first_idx = stat.get("first_index", "")
+        last_idx = stat.get("last_index", "")
+
+        # spread (om din tidigare patch är på plats)
+        radius3d = ""
+        stdx = stdy = stdz = ""
+        spread = stat.get("spread")
+        if spread and "3D" in spread:
+            radius3d = spread["3D"]["radius"]
+            (stdx, stdy, stdz) = spread["3D"]["std"]
+
+        # skriv raden
+        sheet_out.set(f"A{r}", str(absorber))
+        sheet_out.set(f"B{r}", str(ray))
+        sheet_out.set(f"C{r}", str(bounce))
+        sheet_out.set(f"D{r}", "" if prev is None else str(prev))
+        sheet_out.set(f"E{r}", str(int(cnt)))
+        sheet_out.set(f"F{r}", f"{cx}")
+        sheet_out.set(f"G{r}", f"{cy}")
+        sheet_out.set(f"H{r}", f"{cz}")
+        sheet_out.set(f"I{r}", str(first_idx))
+        sheet_out.set(f"J{r}", str(last_idx))
+        sheet_out.set(f"K{r}", "" if radius3d == "" else f"{radius3d}")
+        sheet_out.set(f"L{r}", "" if stdx == "" else f"{stdx}")
+        sheet_out.set(f"M{r}", "" if stdy == "" else f"{stdy}")
+        sheet_out.set(f"N{r}", "" if stdz == "" else f"{stdz}")
+
+        r += 1
+
+    sheet_out.recompute()
+    return sheet_out

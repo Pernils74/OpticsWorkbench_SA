@@ -975,6 +975,35 @@ class RayWorker:
             (newray, totalReflection) = self.traceGrating(fp, nearest_obj, ray1, normal, isec_struct, origin)
             dNewRays.append((newray, P_pass, False))
 
+        elif nearest_obj.OpticalType == "absorber":
+            # Energifördelning: absorber släpper bara igenom (ingen reflex)
+            if hasattr(nearest_obj, "Transparency"):
+                P_pass = energy * (nearest_obj.Transparency) / 100.0
+                P_abs = energy * (100 - nearest_obj.Transparency) / 100.0
+            else:
+                P_pass = 0.0
+                P_abs = energy
+
+            # Logga träffen (räknare/koord/energi) – du gör detta redan ovan
+            # self.collectStatistics(fp, nearest_obj, neworigin, energy, new_state)
+            # (du kallar collectStatistics redan innan grenen väljs, så det
+            #  behövs normalt inte extra här)
+
+            # Om inget ska passera → stoppa strålen
+            if P_pass <= 0:
+                return ret
+
+            # Bestäm utgående riktning vid pass-through:
+            # För absorber: enkel “genomgång” längs -dRay (samma som du gör
+            # för Mirror när Transparency > 0)
+            dRay = neworigin - origin
+            new_dir = -dRay
+
+            # Skapa nästa segment och fortsätt spåra
+            nl = Part.makeLine(neworigin, neworigin - new_dir * fp.MaxRayLength / new_dir.Length)
+            ret.extend(self.traceRay(fp, nl, P_pass, new_state))
+            return ret
+
         else:
             return ret
 

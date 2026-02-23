@@ -4,10 +4,13 @@
 from pydoc import doc
 import FreeCAD as App
 import FreeCADGui as Gui
-import Part
-import Spreadsheet
+
+# import Part
+# import Spreadsheet
+import sa_LiveSheets
+
 import sa_OpticsWorkbench
-import sa_Rayhits_plot
+import sa_plot.sa_Rayhits_plot
 from FreeCAD import Vector, Placement, Rotation
 from PySide import QtWidgets
 import os
@@ -187,7 +190,9 @@ def make_herriott():
     # 8. RayHits Export + Plot
     # ------------------------------------------------------------
     sa_OpticsWorkbench.Hits2CSV()
-    sa_Rayhits_plot.RH_ShowAdvancedPlot()
+    sa_LiveSheets.SA_ShowLiveSheetsDock()
+
+    sa_plot.sa_Rayhits_plot.RH_ShowAdvancedPlot()
 
     return True
 

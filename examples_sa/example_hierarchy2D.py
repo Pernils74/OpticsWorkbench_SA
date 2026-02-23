@@ -34,32 +34,42 @@ def makeLens(doc, name):
 
 def makeMirror(doc, name):
     sketch = doc.addObject("Sketcher::SketchObject", name + "_sketch")
-    sketch.addGeometry(
-        Part.LineSegment(Vector(10.0, 0.0, 0.0), Vector(12.0, 10.0, 0.0))
-    )
+    sketch.addGeometry(Part.LineSegment(Vector(10.0, 0.0, 0.0), Vector(12.0, 10.0, 0.0)))
     mirror = sa_OpticsWorkbench.makeMirror([sketch])
     mirror.Label = name
     return mirror
 
 
 def makeRay_old(name):
-    ray = sa_OpticsWorkbench.makeRay(
-        Vector(0, 0, 0), Vector(2.0, 1.0, 0), beamNrColumns=10, beamDistance=0.4
-    )
+    ray = sa_OpticsWorkbench.makeRay(Vector(0, 0, 0), Vector(2.0, 1.0, 0), beamNrColumns=10, beamDistance=0.4)
+    ray.Placement.Base = Vector(0, -1.5, 0)
+    ray.Label = name
+    return ray
+
+
+def makeRay_original(name):
+    # Basriktning: lokal +Z (matchar nya OpticsWorkbench standard)
+    dir_vector = Vector(0, 0, 1)
+
+    ray = sa_OpticsWorkbench.makeRay(Vector(0, 0, 0), dir_vector, beamNrColumns=10, beamDistance=0.4)
+
     ray.Placement.Base = Vector(0, -1.5, 0)
     ray.Label = name
     return ray
 
 
 def makeRay(name):
-    # Basriktning: lokal +Z (matchar nya OpticsWorkbench standard)
+    # Basriktning: lokal +Z (konsekvent med SA-standard)
     dir_vector = Vector(0, 0, 1)
 
-    ray = sa_OpticsWorkbench.makeRay(
-        Vector(0, 0, 0), dir_vector, beamNrColumns=10, beamDistance=0.4
-    )
+    ray = sa_OpticsWorkbench.makeRay(Vector(0, 0, 0), dir_vector, beamNrColumns=10, beamDistance=0.4)  # position  # riktning (+Z)
 
+    # Placering:
+    # - Flytta ner lite i Y som tidigare
+    # - Rotera 90° runt Y så att dialogen visar (Yaw=0, Pitch=90, Roll=0)
     ray.Placement.Base = Vector(0, -1.5, 0)
+    ray.Placement.Rotation = Rotation(0.0, 90.0, 0.0)  # (yaw, pitch, roll)
+
     ray.Label = name
     return ray
 

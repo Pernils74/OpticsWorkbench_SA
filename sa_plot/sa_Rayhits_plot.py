@@ -26,10 +26,10 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
 # Parser
-from sa_rayhits_parser import get_tree_and_stats_for_sheet
+from sa_plot.sa_rayhits_parser import get_tree_and_stats_for_sheet, export_group_stats_to_sheet
 
 # Plot core
-from sa_plot_core import (
+from sa_plot.sa_plot_core import (
     ColorMixer,
     draw_points,
     draw_blobs_2d,
@@ -113,6 +113,12 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
         btnReload = QtWidgets.QPushButton("Reload")
         btnReload.clicked.connect(self.reload_plot)
         top.addWidget(btnReload)
+
+        # +++ NEW: Export-knapp +++
+        self.btnExport = QtWidgets.QPushButton("Export Stats")
+        self.btnExport.setToolTip("Export group stats to a new spreadsheet (prefix from the selected sheet)")
+        self.btnExport.clicked.connect(self.on_export_stats)
+        top.addWidget(self.btnExport)
 
         top.addSpacing(20)
         top.addWidget(QtWidgets.QLabel("Plane:"))
@@ -389,6 +395,46 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
             self.lblStatus.setText(f"Error: {e}")
             print("RayHitsPlotDialog.reload_plot error:", e)
 
+    def on_export_stats(self):
+        """Exportera gruppnivå-statistik till nytt Spreadsheet-ark.
+
+        - Hämtar sheet-prefix från comboboxen
+        - Använder ev. 'Energy-weighted 3D centroids' (checkbox)
+        - Skapar t.ex. 'RayHits_Stats' (eller ..._Stats001 om upptaget)
+        """
+        if export_group_stats_to_sheet is None:
+            QtWidgets.QMessageBox.critical(self, "Export unavailable", "export_group_stats_to_sheet(...) not found.\n" "Please ensure your sa_rayhits_parser.py contains the export function.")
+            return
+
+        doc = App.ActiveDocument
+        if not doc:
+            QtWidgets.QMessageBox.warning(self, "No document", "No active FreeCAD document found.")
+            return
+
+        sheet_name = self.current_sheet_name()
+        if not sheet_name:
+            QtWidgets.QMessageBox.information(self, "No sheet selected", "Please select a sheet first.")
+            return
+
+        try:
+            exported = export_group_stats_to_sheet(
+                sheet_name=sheet_name,
+                doc=doc,
+                compute_weighted_3d=self.chkCentroidsWeighted.isChecked(),
+            )
+            # För säkerhets skull: recompute och uppdatera comboboxlistan
+            doc.recompute()
+
+            # Markera/arbeta mot det nya bladet i comboboxen
+            new_label = exported.Label or exported.Name
+            idx = self.cmbSheet.findText(new_label)
+            if idx >= 0:
+                self.cmbSheet.setCurrentIndex(idx)
+
+            QtWidgets.QMessageBox.information(self, "Export complete", f"Created sheet: {new_label}")
+        except Exception as ex:
+            QtWidgets.QMessageBox.critical(self, "Export failed", f"{ex}")
+
     # ---------------- Pick/highlight ----------------
     def _install_pick_handler(self, scatter_artists):
         if self._pick_cid is not None:
@@ -444,7 +490,7 @@ def RH_ShowAdvancedPlot():
 class Rayhits_PlotCmd:
     def GetResources(self):
         return {
-            "Pixmap": os.path.join(os.path.dirname(__file__), "icons", "advanced_plot.svg"),
+            "Pixmap": os.path.join(os.path.dirname(__file__), "../icons", "advanced_plot.svg"),
             "MenuText": "RayHits Advanced Plot",
             "ToolTip": "Plot RayHits (absorber/ray filters, blobs, centroids, click)",
         }
