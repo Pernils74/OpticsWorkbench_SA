@@ -12,9 +12,7 @@ _icondir_ = os.path.join(os.path.dirname(__file__), "..")
 
 def create_prism(doc):
     Sketch_Prism = doc.addObject("Sketcher::SketchObject", "Sketch_Prism")
-    add_line = lambda a, b: Sketch_Prism.addGeometry(
-        Part.LineSegment(Vector(a), Vector(b))
-    )
+    add_line = lambda a, b: Sketch_Prism.addGeometry(Part.LineSegment(Vector(a), Vector(b)))
     a = (1.13, 0.26, 0.0)
     b = (1.50, -0.38, 0.0)
     c = (0.76, -0.38, 0.0)
@@ -22,9 +20,7 @@ def create_prism(doc):
     add_line(b, c)
     add_line(c, a)
 
-    add_constraint = lambda *args: Sketch_Prism.addConstraint(
-        Sketcher.Constraint(*args)
-    )
+    add_constraint = lambda *args: Sketch_Prism.addConstraint(Sketcher.Constraint(*args))
     add_constraint("Coincident", 0, 2, 1, 1)
     add_constraint("Coincident", 1, 2, 2, 1)
     add_constraint("Coincident", 2, 2, 0, 1)
@@ -50,8 +46,12 @@ def make_optics():
 
     prism = create_prism(doc)
     doc.recompute()
+
     sa_OpticsWorkbench.makeLens(prism, material="PMMA (plexiglass)").Label = "Refractor"
-    sa_OpticsWorkbench.makeSunRay(maxRayLength=2.0)
+    # Roll (X)  = 0°
+    sun = sa_OpticsWorkbench.makeSunRay(maxRayLength=2.0)
+    sun.Placement = App.Placement(App.Vector(0, 0, 0), App.Rotation(0.0, 90.0, 0.0))  # (yaw, pitch, roll)
+
     doc.recompute()
 
 

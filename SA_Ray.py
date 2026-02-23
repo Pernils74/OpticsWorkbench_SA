@@ -323,7 +323,10 @@ class RayWorker:
                 for row in range(0, int(fp.BeamNrRows)):
                     for n in range(0, int(fp.BeamNrColumns)):
                         if fp.RayBundleType == "parallel":
-                            pos = pl.Rotation.multVec(Vector(0, fp.BeamDistance * n, fp.BeamDistance * row))
+                            # pos = pl.Rotation.multVec(Vector(0, fp.BeamDistance * n, fp.BeamDistance * row))
+                            pos_local = Vector(fp.BeamDistance * row, fp.BeamDistance * n, 0)
+
+                            pos = pl.Rotation.multVec(pos_local)
                             # Changed intial vector to be in z direction, so that the rotation of the ray object is more intuitive, especially for the cone ray bundle type. The old code created the initial vector in x direction and then rotated it to the correct position, which caused some confusion when using the cone ray bundle type with a non-zero cone angle, because the rays were not rotating around the z axis as expected. With the new code, the initial vector is in z direction and then rotated to the correct position, which makes it easier to understand and use the cone ray bundle type with different cone angles.
 
                             dir = Vector(0, 0, 1)

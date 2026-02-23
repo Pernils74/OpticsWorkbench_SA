@@ -64,7 +64,9 @@ def make_Test3D():
     sa_OpticsWorkbench.makeLens([HalfSphere])
 
     doc.recompute()
-    sa_OpticsWorkbench.makeRay(beamNrColumns=20, beamNrRows=10, beamDistance=0.05)
+    ray_beam = sa_OpticsWorkbench.makeRay(Vector(0, 0, 1), beamNrColumns=20, beamNrRows=10, beamDistance=0.05)
+
+    ray_beam.Placement = Placement(Vector(0.0, 0.0, 0.0), Rotation(0.0, 90.0, 0.0))
 
     doc.recompute()
 

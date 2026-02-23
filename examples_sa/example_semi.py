@@ -50,26 +50,10 @@ def createSketch_Sketch002(doc):
 
 def createSketch_Sketch003(doc):
     Sketch003 = doc.addObject("Sketcher::SketchObject", "Sketch003")
-    geo0 = Sketch003.addGeometry(
-        Part.LineSegment(
-            Vector(-5.804982, 35.19952, 0.0), Vector(-5.804982, -28.56389, 0.0)
-        )
-    )
-    geo1 = Sketch003.addGeometry(
-        Part.LineSegment(
-            Vector(-5.804982, -28.56389, 0.0), Vector(72.434807, -28.56389, 0.0)
-        )
-    )
-    geo2 = Sketch003.addGeometry(
-        Part.LineSegment(
-            Vector(72.434807, -28.56389, 0.0), Vector(72.434807, 35.19952, 0.0)
-        )
-    )
-    geo3 = Sketch003.addGeometry(
-        Part.LineSegment(
-            Vector(72.434807, 35.19952, 0.0), Vector(-5.804981999999995, 35.19952, 0.0)
-        )
-    )
+    geo0 = Sketch003.addGeometry(Part.LineSegment(Vector(-5.804982, 35.19952, 0.0), Vector(-5.804982, -28.56389, 0.0)))
+    geo1 = Sketch003.addGeometry(Part.LineSegment(Vector(-5.804982, -28.56389, 0.0), Vector(72.434807, -28.56389, 0.0)))
+    geo2 = Sketch003.addGeometry(Part.LineSegment(Vector(72.434807, -28.56389, 0.0), Vector(72.434807, 35.19952, 0.0)))
+    geo3 = Sketch003.addGeometry(Part.LineSegment(Vector(72.434807, 35.19952, 0.0), Vector(-5.804981999999995, 35.19952, 0.0)))
     Sketch003.addConstraint(Sketcher.Constraint("Coincident", geo0, 2, geo1, 1))
     Sketch003.addConstraint(Sketcher.Constraint("Coincident", geo1, 2, geo2, 1))
     Sketch003.addConstraint(Sketcher.Constraint("Coincident", geo2, 2, geo3, 1))
@@ -114,7 +98,14 @@ def make_semi():
     FullAbsorber.Label = "FullAbsorber"
 
     doc.recompute()
-    sa_OpticsWorkbench.makeRay(beamNrColumns=3, beamDistance=0.2)
+    ray = sa_OpticsWorkbench.makeRay(beamNrColumns=3, beamDistance=0.2)
+
+    # Sätt Ray-rotation exakt som i bilden:
+    #   Yaw (Z)   = 0°
+    #   Pitch (Y) = 90°
+    #   Roll (X)  = 0°
+    ray.Placement = Placement(Vector(0, 0, 0), Rotation(0.0, 90.0, 0.0))  # (yaw, pitch, roll)
+
     doc.recompute()
     sa_OpticsWorkbench.Hits2CSV()
     doc.recompute()
