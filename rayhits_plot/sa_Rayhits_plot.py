@@ -25,10 +25,10 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
 # Parser
-from sa_plot.sa_rayhits_parser import get_tree_and_stats_for_sheet, export_group_stats_to_sheet
+from rayhits_plot.sa_rayhits_parser import get_tree_and_stats_for_sheet, export_group_stats_to_sheet
 
 # Plot core
-from sa_plot.sa_plot_core import (
+from rayhits_plot.sa_plot_core import (
     ColorMixer,
     draw_points,
     draw_blobs_2d,
@@ -572,7 +572,7 @@ def RH_ShowAdvancedPlot():
 class Rayhits_PlotCmd:
     def GetResources(self):
         return {
-            "Pixmap": os.path.join(os.path.dirname(__file__), "../icons", "advanced_plot.svg"),
+            "Pixmap": os.path.join(os.path.dirname(__file__), "../icons", "rayhits_plot.svg"),
             "MenuText": "RayHits Advanced Plot",
             "ToolTip": "Plot RayHits (absorber/ray filters, blobs, centroids, click)",
         }

@@ -31,9 +31,9 @@ class OpticsWorkbench_SA(Workbench):
         # import here all the needed files that create your FreeCAD commands
         import sa_Ray
         import sa_OpticalObject
-        import sa_Plot
+        import rayhits_plot
         import sa_LiveSheets
-        import sa_plot.sa_Rayhits_plot
+        import rayhits_plot.sa_Rayhits_plot
 
         # Import new dock command so it registers the FreeCADGui command
         import sa_Dock as DockCmd

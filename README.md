@@ -155,13 +155,13 @@ This generates the Spreadsheet sheets (RayHits, PreviousHit, BounceCount, …) u
 
 #### 2) Open the Advanced Plot
 
-Press the RayHits Advanced Plot button: ![csv export](./icons/advanced_plot.svg) 
+Press the RayHits Advanced Plot button: ![csv export](./icons/rayhits_plot.svg) 
 
 This opens the interactive plotting window.
 
 
 
-![screenshot](./examples_sa/screenshot_advanced_plot.png)
+![screenshot](./examples_sa/screenshot_rayhits_plot.png)
 ---
 
 #### 🎛️ What You Can Do With the Plot
@@ -221,7 +221,7 @@ Optional axis‑flip mode, particularly helpful when comparing with external too
 
 
 
-![2D example](./examples_sa/screenshot_advanced_plot_2D.png)
-![3D example](./examples_sa/screenshot_advanced_plot_3D.png)
+![2D example](./examples_sa/screenshot_rayhits_plot_2D.png)
+![3D example](./examples_sa/screenshot_rayhits_plot_3D.png)
 
 
