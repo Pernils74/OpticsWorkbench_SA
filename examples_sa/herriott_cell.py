@@ -9,7 +9,7 @@ import Spreadsheet
 import sa_OpticsWorkbench
 import sa_Rayhits_plot
 from FreeCAD import Vector, Placement, Rotation
-from PySide2 import QtWidgets
+from PySide import QtWidgets
 import os
 import math
 
@@ -179,9 +179,7 @@ def make_herriott():
     view = App.Gui.ActiveDocument.ActiveView
 
     # Predefined isometric quaternion
-    iso_rot = Rotation(
-        0.11591698929143902, 0.8804762329080508, 0.2798481572676507, -0.3647051737384002
-    )
+    iso_rot = Rotation(0.11591698929143902, 0.8804762329080508, 0.2798481572676507, -0.3647051737384002)
     view.setCameraOrientation(iso_rot.Q)
     view.fitAll()
 

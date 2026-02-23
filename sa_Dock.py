@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any, List, Tuple, Set
 
 import FreeCAD as App
 import FreeCADGui as Gui
-from PySide2 import QtCore, QtGui, QtWidgets
+from PySide import QtCore, QtGui, QtWidgets
 
 # Internal lists/vars
 # _COMMAND_LIST becomes a list of dicts:
@@ -115,13 +115,7 @@ def _icon_path():
 
 def _command_name_set() -> Set[str]:
     """Set of command names from _COMMAND_LIST (excluding separators)."""
-    return {
-        it["name"]
-        for it in _COMMAND_LIST
-        if isinstance(it, dict)
-        and isinstance(it.get("name"), str)
-        and it["name"].lower() != "separator"
-    }
+    return {it["name"] for it in _COMMAND_LIST if isinstance(it, dict) and isinstance(it.get("name"), str) and it["name"].lower() != "separator"}
 
 
 def _strict_match_action(action: QtWidgets.QAction, cmd_name: str) -> bool:
@@ -295,11 +289,7 @@ def create_or_show_dock():
     dock = DockWidget(parent=mw)
     dock.setObjectName(DOCK_OBJECT_NAME)
     dock.setWindowTitle(DOCK_WINDOW_TITLE)
-    dock.setFeatures(
-        QtWidgets.QDockWidget.DockWidgetMovable
-        | QtWidgets.QDockWidget.DockWidgetFloatable
-        | QtWidgets.QDockWidget.DockWidgetClosable
-    )
+    dock.setFeatures(QtWidgets.QDockWidget.DockWidgetMovable | QtWidgets.QDockWidget.DockWidgetFloatable | QtWidgets.QDockWidget.DockWidgetClosable)
     mw.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
     dock.show()
 
@@ -320,7 +310,7 @@ class Optics_ShowDockPanelCmd:
 
 
 # Register "Dock" command in FreeCAD
-Gui.addCommand("SA_Dock", Optics_ShowDockPanelCmd())
+Gui.addCommand("sa_Dock", Optics_ShowDockPanelCmd())
 
 
 class DockWidget(QtWidgets.QDockWidget):
@@ -330,9 +320,7 @@ class DockWidget(QtWidgets.QDockWidget):
         self.setWidget(central)
 
         # Keep track of buttons for later refresh
-        self._buttons: List[Tuple[str, QtWidgets.QAbstractButton]] = (
-            []
-        )  # (cmd_name, button)
+        self._buttons: List[Tuple[str, QtWidgets.QAbstractButton]] = []  # (cmd_name, button)
 
         root = QtWidgets.QVBoxLayout(central)
         root.setContentsMargins(10, 8, 10, 10)
@@ -441,12 +429,7 @@ class DockWidget(QtWidgets.QDockWidget):
 
                 # Tooltip: override -> QAction.toolTip/statusTip -> existing
                 ovr = overrides.get(cmd_name, {})
-                tip = (
-                    ovr.get("tooltip")
-                    or act.toolTip()
-                    or act.statusTip()
-                    or btn.toolTip()
-                )
+                tip = ovr.get("tooltip") or act.toolTip() or act.statusTip() or btn.toolTip()
                 if isinstance(tip, str):
                     btn.setToolTip(tip)
 
@@ -456,16 +439,12 @@ class DockWidget(QtWidgets.QDockWidget):
                     btn.setText(lbl)
 
             except Exception as e:
-                App.Console.PrintError(
-                    f"[Optics Dock] Refresh via QAction failed for '{cmd_name}': {e}\n"
-                )
+                App.Console.PrintError(f"[Optics Dock] Refresh via QAction failed for '{cmd_name}': {e}\n")
 
         # Retry loop if UI pieces are not yet present
         self._refresh_attempt += 1
         if self._refresh_attempt < self._max_refresh_attempts:
-            QtCore.QTimer.singleShot(
-                self._refresh_interval_ms, self._refresh_from_actions
-            )
+            QtCore.QTimer.singleShot(self._refresh_interval_ms, self._refresh_from_actions)
         else:
             # One last delayed attempt if nothing happened
             if not any_updated:
@@ -484,8 +463,6 @@ class DockWidget(QtWidgets.QDockWidget):
             try:
                 Gui.runCommand(cmd_name, 0)
             except Exception as e:
-                App.Console.PrintError(
-                    f"[Optics Dock] Failed to run '{cmd_name}': {e}\n"
-                )
+                App.Console.PrintError(f"[Optics Dock] Failed to run '{cmd_name}': {e}\n")
 
         return _run

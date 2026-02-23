@@ -20,20 +20,14 @@ def make_Test3D():
     )
 
     Sphere = doc.addObject("Part::Sphere", "Sphere")
-    Sphere.Placement = Placement(
-        Vector(3.00, -19.00, 0.00), Rotation(0.0, 0.0, 0.0, 1.0)
-    )
+    Sphere.Placement = Placement(Vector(3.00, -19.00, 0.00), Rotation(0.0, 0.0, 0.0, 1.0))
 
     Cone = doc.addObject("Part::Cone", "Cone")
-    Cone.Placement = Placement(
-        Vector(68.90, -46.50, -2.30), Rotation(0.0, 0.0, 0.0, 1.0)
-    )
+    Cone.Placement = Placement(Vector(68.90, -46.50, -2.30), Rotation(0.0, 0.0, 0.0, 1.0))
 
     Cylinder = doc.addObject("Part::Cylinder", "Cylinder")
     Cylinder.Height = 50.0
-    Cylinder.Placement = Placement(
-        Vector(40.00, -26.00, -19.00), Rotation(0.0, 0.0, 0.0, 1.0)
-    )
+    Cylinder.Placement = Placement(Vector(40.00, -26.00, -19.00), Rotation(0.0, 0.0, 0.0, 1.0))
     Cylinder.Radius = 50.0
     Cylinder.ViewObject.Transparency = 90
 
@@ -45,9 +39,7 @@ def make_Test3D():
     Cube002 = doc.addObject("Part::Box", "Cube002")
     Cube002.Height = 40.0
     Cube002.Length = 40.0
-    Cube002.Placement = Placement(
-        Vector(-20.00, -25.00, -20.00), Rotation(0.0, 0.0, 0.0, 1.0)
-    )
+    Cube002.Placement = Placement(Vector(-20.00, -25.00, -20.00), Rotation(0.0, 0.0, 0.0, 1.0))
     Cube002.Visibility = False
     Cube002.Width = 40.0
     Cube002.ViewObject.Visibility = False
@@ -67,12 +59,12 @@ def make_Test3D():
 
     doc.recompute()
 
-    sa_OpticsWorkbench.makeMirror([Cube, Sphersa_e, Cone], True)
-    sa_OpticsWorkbench.makeAbsorsa_ber([Cylinder])
-    sa_OpticsWorkbench.makeLensa_s([HalfSphere])
+    sa_OpticsWorkbench.makeMirror([Cube, Sphere, Cone], True)
+    sa_OpticsWorkbench.makeAbsorber([Cylinder])
+    sa_OpticsWorkbench.makeLens([HalfSphere])
 
     doc.recompute()
-    sa_OpticsWorkbench.makeRay(beamNrColumns=20, beamNrRows=10, beasa_mDistance=0.05)
+    sa_OpticsWorkbench.makeRay(beamNrColumns=20, beamNrRows=10, beamDistance=0.05)
 
     doc.recompute()
 

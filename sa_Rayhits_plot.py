@@ -9,8 +9,8 @@ from typing import Dict, Any, Optional
 import FreeCAD as App
 import FreeCADGui as Gui
 
-from PySide2 import QtWidgets
-from PySide2.QtCore import Qt, QEvent
+from PySide import QtWidgets
+from PySide.QtCore import Qt, QEvent
 
 
 import matplotlib
@@ -60,9 +60,7 @@ class PlotConfig:
     smooth_blobs: bool
     blob_strength: float
     show_centroids: bool
-    show_weighted_centroids: (
-        bool  # om parsern levererar viktade (kan vara False initialt)
-    )
+    show_weighted_centroids: bool  # om parsern levererar viktade (kan vara False initialt)
 
     @property
     def is3d(self) -> bool:
@@ -278,9 +276,7 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
 
         try:
             # Hämta tree + stats via parsern (weights avstängda som default)
-            tree, stats = get_tree_and_stats_for_sheet(
-                sheet_name, compute_weighted_3d=self.chkCentroidsWeighted.isChecked()
-            )
+            tree, stats = get_tree_and_stats_for_sheet(sheet_name, compute_weighted_3d=self.chkCentroidsWeighted.isChecked())
             self.lblStatus.setText("Data loaded")
 
             # Checkbox sync
@@ -293,9 +289,7 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
 
             # Figure layout
             self.fig.clear()
-            gs = gridspec.GridSpec(
-                nrows=2, ncols=1, height_ratios=[12, 2], figure=self.fig
-            )
+            gs = gridspec.GridSpec(nrows=2, ncols=1, height_ratios=[12, 2], figure=self.fig)
 
             cfg = PlotConfig(
                 plane_text=self.cmbPlane.currentText(),
@@ -316,11 +310,7 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
                 if cfg.equal_on and hasattr(ax, "set_box_aspect"):
                     ax.set_box_aspect([1, 1, 1])
             else:
-                (
-                    ax.grid(cfg.grid_on, linestyle="--", alpha=0.35)
-                    if cfg.grid_on
-                    else ax.grid(False)
-                )
+                (ax.grid(cfg.grid_on, linestyle="--", alpha=0.35) if cfg.grid_on else ax.grid(False))
                 ax.set_aspect("equal" if cfg.equal_on else "auto", adjustable="datalim")
 
             ax_leg = self.fig.add_subplot(gs[1, 0])
@@ -328,15 +318,11 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
 
             # Legend domains + mixer + marker map
             rays_sorted, bounces_sorted, prevs_sorted = compute_domains_for_legend(tree)
-            ray_marker = {
-                r: MARKERS[i % len(MARKERS)] for i, r in enumerate(rays_sorted)
-            }
+            ray_marker = {r: MARKERS[i % len(MARKERS)] for i, r in enumerate(rays_sorted)}
             mixer = ColorMixer(prevs_sorted, bounces_sorted)
 
             # Build visibility dicts
-            absorber_on = {
-                k: cb.isChecked() for k, cb in self.absorber_checkboxes.items()
-            }
+            absorber_on = {k: cb.isChecked() for k, cb in self.absorber_checkboxes.items()}
             ray_on = {k: cb.isChecked() for k, cb in self.ray_checkboxes.items()}
 
             # Plane key
@@ -392,9 +378,7 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
                 )
 
             # Legends
-            build_legends(
-                ax_leg, rays_sorted, prevs_sorted, bounces_sorted, ray_marker, mixer
-            )
+            build_legends(ax_leg, rays_sorted, prevs_sorted, bounces_sorted, ray_marker, mixer)
 
             # Pick handler
             self._install_pick_handler(scatters)
@@ -460,9 +444,7 @@ def RH_ShowAdvancedPlot():
 class Rayhits_PlotCmd:
     def GetResources(self):
         return {
-            "Pixmap": os.path.join(
-                os.path.dirname(__file__), "icons", "advanced_plot.svg"
-            ),
+            "Pixmap": os.path.join(os.path.dirname(__file__), "icons", "advanced_plot.svg"),
             "MenuText": "RayHits Advanced Plot",
             "ToolTip": "Plot RayHits (absorber/ray filters, blobs, centroids, click)",
         }
@@ -474,4 +456,4 @@ class Rayhits_PlotCmd:
         return True
 
 
-Gui.addCommand("SA_Rayhits_Plot", Rayhits_PlotCmd())
+Gui.addCommand("sa_Rayhits_Plot", Rayhits_PlotCmd())

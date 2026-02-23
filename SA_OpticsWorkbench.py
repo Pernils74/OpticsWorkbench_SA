@@ -177,7 +177,7 @@ def makeSunRay(
 
 
 def restartAll():
-    from PySide2 import QtWidgets
+    from PySide import QtWidgets
     import sa_ObjectUpgrade  # NEW
 
     doc = activeDocument()
@@ -198,17 +198,13 @@ def restartAll():
         lines = []
 
         if missing_id_objects:
-            lines.append(
-                "The following objects were created in the ORIGINAL OpticsWorkBench:\n"
-            )
+            lines.append("The following objects were created in the ORIGINAL OpticsWorkBench:\n")
             for o in missing_id_objects:
                 lines.append(f"- {o.Label}")
             lines.append("")  # tom rad
 
         if wrong_version_objects:
-            lines.append(
-                "The following objects were created with an older/different version of the SA Workbench:\n"
-            )
+            lines.append("The following objects were created with an older/different version of the SA Workbench:\n")
             for o in wrong_version_objects:
                 # visa även det detekterade id:t för tydlighet
                 try:
@@ -218,9 +214,7 @@ def restartAll():
                 lines.append(f"- {o.Label} (WorkbenchId={wb_id})")
             lines.append("")
 
-        lines.append(
-            "Do you want to automatically rebuild them using the SA_Workbench?"
-        )
+        lines.append("Do you want to automatically rebuild them using the SA_Workbench?")
         msg = "\n".join(lines)
 
         reply = QtWidgets.QMessageBox.question(
@@ -277,6 +271,7 @@ def makeMirror(base=[], collectStatistics=False, transparency=0):
         collectStatistics=collectStatistics,
         transparency=transparency,
     )
+
     sa_OpticalObject.OpticalObjectViewProvider(fp.ViewObject)
     recompute()
     return fp
@@ -433,18 +428,14 @@ def Hits2CSV(sheet_name=None, setFocus=True):
 
                     #     f"Processing {eachObject.Label} - {ray_name} with {len(coords)} hits"
                     # )
-                    print(
-                        f"Looking for attributes: {energy_attr}, {bounce_attr}, {rayid_attr}, {previous_attr}"
-                    )
+                    print(f"Looking for attributes: {energy_attr}, {bounce_attr}, {rayid_attr}, {previous_attr}")
 
                     energy = getattr(eachObject, energy_attr, None)
                     bounces = getattr(eachObject, bounce_attr, None)
                     rayids = getattr(eachObject, rayid_attr, None)
                     previous = getattr(eachObject, previous_attr, None)
 
-                    print(
-                        f"Found energy: {energy is not None}, bounces: {bounces is not None}, rayids: {rayids is not None}, previous: {previous is not None}"
-                    )
+                    print(f"Found energy: {energy is not None}, bounces: {bounces is not None}, rayids: {rayids is not None}, previous: {previous is not None}")
 
                     for i, co in enumerate(coords):
                         row += 1

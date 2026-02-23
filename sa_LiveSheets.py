@@ -14,7 +14,7 @@ import string
 
 import FreeCAD as App
 import FreeCADGui as Gui
-from PySide2 import QtCore, QtGui, QtWidgets
+from PySide import QtCore, QtGui, QtWidgets
 
 
 DOCK_OBJECT_NAME = "SA_LiveSheetsDock"
@@ -101,9 +101,7 @@ def _get_sheets(doc):
     dn = DEFAULT_SHEET.casefold() if DEFAULT_SHEET else None
 
     def is_default(s):
-        return dn and (
-            ((s.Name or "").casefold() == dn) or ((s.Label or "").casefold() == dn)
-        )
+        return dn and (((s.Name or "").casefold() == dn) or ((s.Label or "").casefold() == dn))
 
     def alpha_key(s):
         primary = s.Label if (s.Label and s.Label.strip()) else s.Name
@@ -113,9 +111,7 @@ def _get_sheets(doc):
     if not sheets:
         return None, None
 
-    sorted_sheets = sorted(
-        sheets, key=lambda s: (0 if is_default(s) else 1,) + alpha_key(s)
-    )
+    sorted_sheets = sorted(sheets, key=lambda s: (0 if is_default(s) else 1,) + alpha_key(s))
     default_idx = next((i for i, s in enumerate(sorted_sheets) if is_default(s)), None)
 
     return sorted_sheets, default_idx
@@ -160,10 +156,7 @@ class SA_LiveSheetsDock(QtWidgets.QDockWidget):
         self.chkAutoRecompute.setChecked(True)
 
         btn = QtWidgets.QPushButton("Recompute now")
-        btn.clicked.connect(
-            lambda: App.ActiveDocument
-            and recompute_doc(App.ActiveDocument, note="Manual SA recompute")
-        )
+        btn.clicked.connect(lambda: App.ActiveDocument and recompute_doc(App.ActiveDocument, note="Manual SA recompute"))
 
         ctrl.addWidget(self.chkAutoRecompute)
         ctrl.addStretch(1)
@@ -308,9 +301,7 @@ class SA_LiveSheetsDock(QtWidgets.QDockWidget):
                 if old_key and label.casefold() == old_key:
                     match_idx = i
 
-            self.cmbSheets.setCurrentIndex(
-                match_idx if match_idx is not None else def_idx or 0
-            )
+            self.cmbSheets.setCurrentIndex(match_idx if match_idx is not None else def_idx or 0)
 
         self.cmbSheets.blockSignals(False)
         self._reload_sheet()
@@ -366,4 +357,4 @@ class SA_LiveSheetsCmd:
         return True
 
 
-Gui.addCommand("SA_LiveSheets", SA_LiveSheetsCmd())
+Gui.addCommand("sa_LiveSheets", SA_LiveSheetsCmd())

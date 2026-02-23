@@ -17,8 +17,7 @@ import FreeCAD
 
 translate = FreeCAD.Qt.translate
 
-
-# def translate(context, text):
+# def QT_TRANSLATE_NOOP(context, text):
 #     return text
 
 
@@ -75,9 +74,7 @@ class RayWorker:
         rayBundleType="",
     ):
 
-        fp.addProperty(
-            "App::PropertyBool", "Power", "Ray", translate("Ray", "On or Off")
-        ).Power = power
+        fp.addProperty("App::PropertyBool", "Power", "Ray", translate("Ray", "On or Off")).Power = power
         fp.addProperty(
             "App::PropertyIntegerConstraint",
             "BeamNrColumns",
@@ -160,9 +157,7 @@ class RayWorker:
         self.lastRefIdx = []
         self.iter = 0
         self.ray_counter = 0
-        self.stats_buffer = (
-            {}
-        )  # buffer for statistics collection, keyed by ray_id, to avoid per-hit property appends
+        self.stats_buffer = {}  # buffer for statistics collection, keyed by ray_id, to avoid per-hit property appends
 
         # self.last_hit_per_ray = {}  # ray_id -> (obj, part, point, energy, bounce)
 
@@ -257,9 +252,7 @@ class RayWorker:
             r2.invert()
             sunObj.Placement.Rotation = r2
 
-            posdirarray = self.getPosDirFromFaces(
-                sunObj.Faces, fp.BeamNrRows, fp.BeamNrColumns
-            )
+            posdirarray = self.getPosDirFromFaces(sunObj.Faces, fp.BeamNrRows, fp.BeamNrColumns)
 
         # if a spherical 3d ray is requested create an evenly spaced ray bundle in 3d
         elif fp.RayBundleType == "spherical":
@@ -291,9 +284,7 @@ class RayWorker:
                 # if the beam is 2d, create only two points on the each projecting circle
                 if int(fp.BeamNrRows) == 1:
                     M_angle2 = 2
-                if (
-                    M_angle2 == 0
-                ):  # if angle is 0 then set one ray in the vertical position
+                if M_angle2 == 0:  # if angle is 0 then set one ray in the vertical position
                     angle2 = 0
                     dir = Vector(
                         math.sin(angle1) * math.cos(angle2),
@@ -332,9 +323,7 @@ class RayWorker:
                 for row in range(0, int(fp.BeamNrRows)):
                     for n in range(0, int(fp.BeamNrColumns)):
                         if fp.RayBundleType == "parallel":
-                            pos = pl.Rotation.multVec(
-                                Vector(0, fp.BeamDistance * n, fp.BeamDistance * row)
-                            )
+                            pos = pl.Rotation.multVec(Vector(0, fp.BeamDistance * n, fp.BeamDistance * row))
                             # Changed intial vector to be in z direction, so that the rotation of the ray object is more intuitive, especially for the cone ray bundle type. The old code created the initial vector in x direction and then rotated it to the correct position, which caused some confusion when using the cone ray bundle type with a non-zero cone angle, because the rays were not rotating around the z axis as expected. With the new code, the initial vector is in z direction and then rotated to the correct position, which makes it easier to understand and use the cone ray bundle type with different cone angles.
 
                             dir = Vector(0, 0, 1)
@@ -342,9 +331,7 @@ class RayWorker:
                         else:
                             r = Rotation()
                             r.Axis = Vector(0, 0, 1)
-                            r.Angle = (
-                                n * 2 * math.pi / fp.BeamNrColumns * coneAngle / 360
-                            )
+                            r.Angle = n * 2 * math.pi / fp.BeamNrColumns * coneAngle / 360
                             pos = Vector(0, 0, 0)
                             dir1 = r.multVec(Vector(1, 0, 0))
 
@@ -398,30 +385,15 @@ class RayWorker:
             for row in range(0, int(BeamNrRows)):
                 for col in range(0, int(BeamNrColumns)):
                     if len(face.ParameterRange) == 4:
-                        param1 = (
-                            face.ParameterRange[0]
-                            + (face.ParameterRange[1] - face.ParameterRange[0])
-                            * (row + 0.5)
-                            / BeamNrRows
-                        )
-                        param2 = (
-                            face.ParameterRange[2]
-                            + (face.ParameterRange[3] - face.ParameterRange[2])
-                            * (col + 0.5)
-                            / BeamNrColumns
-                        )
+                        param1 = face.ParameterRange[0] + (face.ParameterRange[1] - face.ParameterRange[0]) * (row + 0.5) / BeamNrRows
+                        param2 = face.ParameterRange[2] + (face.ParameterRange[3] - face.ParameterRange[2]) * (col + 0.5) / BeamNrColumns
                         newdir = face.normalAt(param1, param2)
                         newpos = face.valueAt(param1, param2)
                         v = Part.Vertex(newpos)
                         if face.distToShape(v)[0] < EPSILON:
                             posdirarray.append((newpos, newdir))
                     elif len(face.ParameterRange) == 2:
-                        param1 = (
-                            face.ParameterRange[0]
-                            + (face.ParameterRange[1] - face.ParameterRange[0])
-                            * (row + 0.5)
-                            / BeamNrRows
-                        )
+                        param1 = face.ParameterRange[0] + (face.ParameterRange[1] - face.ParameterRange[0]) * (row + 0.5) / BeamNrRows
                         try:
                             newdir = face.normalAt(param1)
                         except:
@@ -469,9 +441,7 @@ class RayWorker:
             pdir = pl.Rotation.multVec(dir)
             if fp.Power == True:
                 self.iter = fp.MaxNrReflections
-                firstLine = Part.makeLine(
-                    ppos, ppos + pdir * fp.MaxRayLength / pdir.Length
-                )
+                firstLine = Part.makeLine(ppos, ppos + pdir * fp.MaxRayLength / pdir.Length)
 
                 self.lastRefIdx = []
 
@@ -480,9 +450,7 @@ class RayWorker:
                     self.ray_counter += 1
                     ray_id = self.ray_counter
 
-                    state = RayState(
-                        ray_id
-                    )  # Initiera state med ray_id =0  och bounce_count=0
+                    state = RayState(ray_id)  # Initiera state med ray_id =0  och bounce_count=0
                     tracedLines = self.traceRay(fp, firstLine, 100, state)
                     # tracedLines = self.traceRay(fp, (firstLine, 100, 0, ray_id))
 
@@ -501,6 +469,77 @@ class RayWorker:
         return linearray
 
     def getIntersections(self, fp, line):
+        """returns [(OpticalObject, [(edge/face, intersection point, ...metadata)])]"""
+        isec_struct = []
+
+        # Globalt CS
+        origin = PointVec(line.Vertexes[0])
+        dir = PointVec(line.Vertexes[1]) - origin
+
+        for optobj in activeDocument().Objects:
+            if not isRelevantOptic(fp, optobj):
+                continue
+
+            isec_parts = []
+            for obj in optobj.Base:
+                bb = obj.Shape.BoundBox
+                if not (bb.isValid() and bb.intersect(origin, dir)):
+                    continue
+
+                # --- EDGES (Sketch/2D) ---
+                if len(obj.Shape.Solids) == 0 and len(obj.Shape.Shells) == 0:
+                    for i, edge in enumerate(obj.Shape.Edges, start=1):
+                        # normal i globalt CS
+                        if len(edge.Vertexes) == 2:
+                            edgedir = PointVec(edge.Vertexes[1]) - PointVec(edge.Vertexes[0])
+                        else:
+                            edgedir = edge.valueAt(0) - edge.valueAt(0.5)
+
+                        normal = dir.cross(edgedir)
+                        if normal.Length <= EPSILON:
+                            continue
+
+                        plane = Part.Plane(origin, normal)
+                        # linje och edge i GLOBALT CS
+                        isec = line.Curve.intersect2d(edge.Curve, plane)
+                        if not isec:
+                            continue
+
+                        for u, v in isec:
+                            p2 = plane.value(u, v)
+                            dist = p2 - origin
+                            vert = Part.Vertex(p2)
+                            if dist.Length > EPSILON and vert.distToShape(edge)[0] < EPSILON and vert.distToShape(line)[0] < EPSILON:
+                                # Lägg INTE transformera edge in-place
+                                # Om du vill spara en kopia:
+                                # edge_copy = Part.Edge(edge)
+                                # isec_parts.append((edge_copy, PointVec(p2), obj, i))
+                                isec_parts.append((edge, PointVec(p2), obj, i))
+
+                # --- FACES (om det finns) ---
+                for i, face in enumerate(obj.Shape.Faces, start=1):
+                    if not face.BoundBox.intersect(origin, dir):
+                        continue
+
+                    isec = line.Curve.intersect(face.Surface)
+                    if not isec:
+                        continue
+
+                    for p in isec[0]:
+                        dist = Vector(p.X - origin.x, p.Y - origin.y, p.Z - origin.z)
+                        vert = Part.Vertex(p)
+                        if dist.Length > EPSILON and vert.distToShape(face)[0] < EPSILON and vert.distToShape(line)[0] < EPSILON:
+                            # Spara face (globalt). Kopia om du vill:
+                            # face_global = face.transformed(FreeCAD.Base.Matrix())  # identitet
+                            # isec_parts.append((face_global, PointVec(p), obj, i))
+                            isec_parts.append((face, PointVec(p), obj, i))
+
+            if isec_parts:
+                isec_struct.append((optobj, isec_parts))
+
+        return isec_struct
+
+    def getIntersections_old(self, fp, line):
         """returns [(OpticalObject, [(edge/face, intersection point)] )]"""
         isec_struct = []
         for optobj in activeDocument().Objects:
@@ -521,9 +560,7 @@ class RayWorker:
 
                                 # get a normal to the plane where the edge is lying in
                                 if len(edge.Vertexes) == 2:
-                                    edgedir = PointVec(edge.Vertexes[1]) - PointVec(
-                                        edge.Vertexes[0]
-                                    )
+                                    edgedir = PointVec(edge.Vertexes[1]) - PointVec(edge.Vertexes[0])
                                 else:
                                     # workaround for circles
                                     edgedir = edge.valueAt(0) - edge.valueAt(0.5)
@@ -531,28 +568,17 @@ class RayWorker:
                                 normal = dir.cross(edgedir)
                                 if normal.Length > EPSILON:
                                     plane = Part.Plane(origin, normal)
-                                    isec = optobj_line.Curve.intersect2d(
-                                        edge.Curve, plane
-                                    )
+                                    isec = optobj_line.Curve.intersect2d(edge.Curve, plane)
                                     if isec:
                                         for p in isec:
                                             p2 = plane.value(p[0], p[1])
                                             dist = p2 - origin
                                             vert = Part.Vertex(p2)
-                                            if (
-                                                dist.Length > EPSILON
-                                                and vert.distToShape(edge)[0] < EPSILON
-                                                and vert.distToShape(optobj_line)[0]
-                                                < EPSILON
-                                            ):
+                                            if dist.Length > EPSILON and vert.distToShape(edge)[0] < EPSILON and vert.distToShape(optobj_line)[0] < EPSILON:
                                                 # transform edge and ray back to global coordinate
-                                                vert.transformShape(
-                                                    optobj_placement_matrix
-                                                )
+                                                vert.transformShape(optobj_placement_matrix)
                                                 p2 = PointVec(vert)
-                                                edge.transformShape(
-                                                    optobj_placement_matrix
-                                                )
+                                                edge.transformShape(optobj_placement_matrix)
                                                 # isec_parts.append((edge, p2))
                                                 # For be able to get the last hitted face id
                                                 # isec_parts.append(
@@ -573,12 +599,7 @@ class RayWorker:
                                             p.Z - origin.z,
                                         )
                                         vert = Part.Vertex(p)
-                                        if (
-                                            dist.Length > EPSILON
-                                            and vert.distToShape(face)[0] < EPSILON
-                                            and vert.distToShape(optobj_line)[0]
-                                            < EPSILON
-                                        ):
+                                        if dist.Length > EPSILON and vert.distToShape(face)[0] < EPSILON and vert.distToShape(optobj_line)[0] < EPSILON:
                                             # transform face and ray back to global coordinate
                                             p.transform(optobj_placement_matrix)
                                             # face.transformShape(optobj_placement_matrix)
@@ -592,12 +613,8 @@ class RayWorker:
                                             #     (face, PointVec(p), obj, f"Face{i}")
                                             # )
                                             # isec_parts.append((face, PointVec(p), obj))
-                                            face_global = face.transformed(
-                                                optobj_placement_matrix
-                                            )
-                                            isec_parts.append(
-                                                (face_global, PointVec(p), obj, i)
-                                            )
+                                            face_global = face.transformed(optobj_placement_matrix)
+                                            isec_parts.append((face_global, PointVec(p), obj, i))
 
                 if len(isec_parts) > 0:
                     isec_struct.append((optobj, isec_parts))
@@ -740,9 +757,7 @@ class RayWorker:
             newRefIdx = self.lastRefIdx[len(self.lastRefIdx) - 2]
 
         if len(nearest_obj.Sellmeier) == 6:
-            n = sa_OpticalObject.refraction_index_from_sellmeier(
-                fp.Wavelength, nearest_obj.Sellmeier
-            )
+            n = sa_OpticalObject.refraction_index_from_sellmeier(fp.Wavelength, nearest_obj.Sellmeier)
         else:
             n = nearest_obj.RefractionIndex
 
@@ -774,9 +789,7 @@ class RayWorker:
             newRefIdx = self.lastRefIdx[len(self.lastRefIdx) - 2]
 
         if len(nearest_obj.Sellmeier) == 6:
-            n = sa_OpticalObject.refraction_index_from_sellmeier(
-                fp.Wavelength, nearest_obj.Sellmeier
-            )
+            n = sa_OpticalObject.refraction_index_from_sellmeier(fp.Wavelength, nearest_obj.Sellmeier)
         else:
             n = nearest_obj.RefractionIndex
 
@@ -808,9 +821,7 @@ class RayWorker:
                 oldRefIdx,
             )
 
-        elif (
-            grating_type == 2
-        ):  # transmission grating with diffraction at first surface
+        elif grating_type == 2:  # transmission grating with diffraction at first surface
             if self.isInsideLens(isec_struct, origin, nearest_obj):
                 doLens = True
                 # print("leave t-grating 1s " + nearest_obj.Label)
@@ -835,9 +846,7 @@ class RayWorker:
                     newRefIdx,
                 )
 
-        elif (
-            grating_type == 1
-        ):  # transmission grating with diffraction at second surface
+        elif grating_type == 1:  # transmission grating with diffraction at second surface
             if self.isInsideLens(isec_struct, origin, nearest_obj):
                 # print("leave t-grating 2s " + nearest_obj.Label)
                 oldRefIdx = n
@@ -893,10 +902,7 @@ class RayWorker:
                     if abs(dist.Length - nearest.Length) < EPSILON:
                         if isec[0].OpticalType == "absorber":
                             nearest_parts = [np]
-                        elif (
-                            len(nearest_parts) == 0
-                            or nearest_parts[0][2].OpticalType == "absorber"
-                        ):
+                        elif len(nearest_parts) == 0 or nearest_parts[0][2].OpticalType == "absorber":
                             nearest_parts.append(np)
                     else:
                         nearest_parts = [np]
@@ -912,9 +918,7 @@ class RayWorker:
             nearest_parts = [nearest_parts[0]]
 
         # Unpack nearest hit
-        neworigin, nearest_part, nearest_obj, nearest_base, face_index = nearest_parts[
-            0
-        ]
+        neworigin, nearest_part, nearest_obj, nearest_base, face_index = nearest_parts[0]
 
         # Segment at the hit point
         shortline = Part.makeLine(origin, neworigin)
@@ -924,9 +928,7 @@ class RayWorker:
         new_state = state.bounced(nearest_obj, nearest_base, face_index)
 
         # Log hit immediately
-        if isRelevantOptic(fp, nearest_obj) and getattr(
-            nearest_obj, "collectStatistics", False
-        ):
+        if isRelevantOptic(fp, nearest_obj) and getattr(nearest_obj, "collectStatistics", False):
             self.collectStatistics(fp, nearest_obj, neworigin, energy, new_state)
 
         # Stop condition after logging
@@ -959,9 +961,7 @@ class RayWorker:
                 dNewRays.append((-dRay, P_pass, False))
 
         elif nearest_obj.OpticalType == "lens":
-            (newray, totalReflection) = self.traceLens(
-                fp, nearest_obj, ray1, normal, isec_struct, origin
-            )
+            (newray, totalReflection) = self.traceLens(fp, nearest_obj, ray1, normal, isec_struct, origin)
             if self.isInsideLens(isec_struct, origin, nearest_obj):
                 P_pass = energy
             elif nearest_obj.Transparency < 100 and not totalReflection:
@@ -969,9 +969,7 @@ class RayWorker:
             dNewRays.append((newray, P_pass, False))
 
         elif nearest_obj.OpticalType == "grating":
-            (newray, totalReflection) = self.traceGrating(
-                fp, nearest_obj, ray1, normal, isec_struct, origin
-            )
+            (newray, totalReflection) = self.traceGrating(fp, nearest_obj, ray1, normal, isec_struct, origin)
             dNewRays.append((newray, P_pass, False))
 
         else:
@@ -979,9 +977,7 @@ class RayWorker:
 
         # Recurse
         for dvec, energy_next, _ in dNewRays:
-            nl = Part.makeLine(
-                neworigin, neworigin - dvec * fp.MaxRayLength / dvec.Length
-            )
+            nl = Part.makeLine(neworigin, neworigin - dvec * fp.MaxRayLength / dvec.Length)
             ret.extend(self.traceRay(fp, nl, energy_next, new_state))
 
         return ret
@@ -1017,15 +1013,11 @@ class RayWorker:
         if root < 0:  # total reflection
             return (self.mirror(ray, normal), True)
 
-        refractedRay = -n1 / n2 * normal.cross(
-            (-normal).cross(ray)
-        ) - normal * math.sqrt(root)
+        refractedRay = -n1 / n2 * normal.cross((-normal).cross(ray)) - normal * math.sqrt(root)
 
         return (refractedRay, False)
 
-    def grating_calculation(
-        self, grating_type, order, wavelength, lpm, ray, normal, g_g_p_vector, n1, n2
-    ):  # from Ludwig 1970
+    def grating_calculation(self, grating_type, order, wavelength, lpm, ray, normal, g_g_p_vector, n1, n2):  # from Ludwig 1970
         # get parameters
         wavelength = wavelength / 1000
         ray = ray / ray.Length
@@ -1053,17 +1045,9 @@ class RayWorker:
         T = (order * wavelength) / (n1 * d)
         # print("T", T)
         # print("ray", ray[0], ray[1], ray[2])
-        V = (
-            mu
-            * (ray[0] * surf_norma[0] + ray[1] * surf_norma[1] + ray[2] * surf_norma[2])
-        ) / surf_norma.dot(surf_norma)
+        V = (mu * (ray[0] * surf_norma[0] + ray[1] * surf_norma[1] + ray[2] * surf_norma[2])) / surf_norma.dot(surf_norma)
         # print("V", V)
-        W = (
-            mu**2
-            - 1
-            + T**2
-            - 2 * mu * T * (ray[0] * D[0] + ray[1] * D[1] + ray[2] * D[2])
-        ) / surf_norma.dot(surf_norma)
+        W = (mu**2 - 1 + T**2 - 2 * mu * T * (ray[0] * D[0] + ray[1] * D[1] + ray[2] * D[2])) / surf_norma.dot(surf_norma)
         # print("W", W)
         # print("calc_test ", (ray[0]*D[0]+ray[1]*D[1]+ray[2]*D[2]))
         # print ("W>V**2? ", W>V**2)
@@ -1131,9 +1115,25 @@ class RayWorker:
         return False
 
 
-def PointVec(point):
-    """Converts a Part::Point to a FreeCAD::Vector"""
-    return Vector(point.X, point.Y, point.Z)
+def PointVec(p):
+    # OCC gp_Pnt (versaler)
+    if hasattr(p, "X") and hasattr(p, "Y") and hasattr(p, "Z"):
+        return Vector(p.X, p.Y, p.Z)
+
+    # Part.Vertex -> .Point är en Base.Vector
+    if hasattr(p, "Point"):
+        v = p.Point
+        return Vector(v.x, v.y, v.z)
+
+    # FreeCAD/Base.Vector (gemener)
+    if hasattr(p, "x") and hasattr(p, "y") and hasattr(p, "z"):
+        return Vector(p.x, p.y, p.z)
+
+    # tuple/list fallback
+    if isinstance(p, (tuple, list)) and len(p) >= 3:
+        return Vector(p[0], p[1], p[2])
+
+    raise TypeError(f"Unsupported point type: {type(p)}")
 
 
 # def isOpticalObject(obj):
@@ -1145,14 +1145,7 @@ def PointVec(point):
 
 
 def isOpticalObject(obj):
-    return (
-        hasattr(obj, "OpticalType")
-        and hasattr(obj, "Base")
-        and (
-            obj.isDerivedFrom("App::FeaturePython")
-            or obj.isDerivedFrom("Part::FeaturePython")
-        )
-    )
+    return hasattr(obj, "OpticalType") and hasattr(obj, "Base") and (obj.isDerivedFrom("App::FeaturePython") or obj.isDerivedFrom("Part::FeaturePython"))
 
 
 def isRelevantOptic(fp, obj):
@@ -1286,9 +1279,7 @@ class Beam2D:
         """Will be called when the feature is executed."""
         # Generate commands in the FreeCAD python console to create Ray
         Gui.doCommand("import sa_OpticsWorkbench")
-        Gui.doCommand(
-            'sa_OpticsWorkbench.makeRay(beamNrColumns=50, beamDistance=0.1, rayBundleType="parallel")'
-        )
+        Gui.doCommand('sa_OpticsWorkbench.makeRay(beamNrColumns=50, beamDistance=0.1, rayBundleType="parallel")')
 
     def IsActive(self):
         """Here you can define if the command must be active or not (greyed) if certain conditions
@@ -1315,9 +1306,7 @@ class RadialBeam2D:
         """Will be called when the feature is executed."""
         # Generate commands in the FreeCAD python console to create Ray
         Gui.doCommand("import sa_OpticsWorkbench")
-        Gui.doCommand(
-            'sa_OpticsWorkbench.makeRay(beamNrColumns=64, rayBundleType="spherical")'
-        )
+        Gui.doCommand('sa_OpticsWorkbench.makeRay(beamNrColumns=64, rayBundleType="spherical")')
 
     def IsActive(self):
         """Here you can define if the command must be active or not (greyed) if certain conditions
@@ -1347,9 +1336,7 @@ class SphericalBeam:
         """Will be called when the feature is executed."""
         # Generate commands in the FreeCAD python console to create Ray
         Gui.doCommand("import sa_OpticsWorkbench")
-        Gui.doCommand(
-            'sa_OpticsWorkbench.makeRay(beamNrColumns=8, beamNrRows=8, rayBundleType="spherical")'
-        )
+        Gui.doCommand('sa_OpticsWorkbench.makeRay(beamNrColumns=8, beamNrRows=8, rayBundleType="spherical")')
 
     def IsActive(self):
         """Here you can define if the command must be active or not (greyed) if certain conditions
@@ -1365,9 +1352,7 @@ class SphericalBeam:
             "Pixmap": os.path.join(_icondir_, "sun3D.svg"),
             "Accel": "",  # a default shortcut (optional)
             "MenuText": translate("Spherical Beam", "Spherical Beam"),
-            "ToolTip": translate(
-                "Spherical Beam", "Rays coming from one point going to all directions"
-            ),
+            "ToolTip": translate("Spherical Beam", "Rays coming from one point going to all directions"),
         }
 
 
@@ -1430,31 +1415,25 @@ class GridToFocalBeam:
 
     def Activated(self):
         Gui.doCommand("import sa_OpticsWorkbench")
-        Gui.doCommand(
-            'r = sa_OpticsWorkbench.makeRay(beamNrColumns=10, beamNrRows=3, beamDistance=1.0, rayBundleType="focal", focalPoint=FreeCAD.Vector(0, 0, 100))'
-        )
+        Gui.doCommand('r = sa_OpticsWorkbench.makeRay(beamNrColumns=10, beamNrRows=3, beamDistance=1.0, rayBundleType="focal", focalPoint=FreeCAD.Vector(0, 0, 100))')
 
     def IsActive(self):
         return activeDocument() is not None
 
     def GetResources(self):
         return {
-            "Pixmap": os.path.join(
-                _icondir_, "raygridfocal.svg"
-            ),  # You can add your own icon
+            "Pixmap": os.path.join(_icondir_, "raygridfocal.svg"),  # You can add your own icon
             "Accel": "",
             "MenuText": translate("Grid Focal Beam", "Grid Focal Beam"),
-            "ToolTip": translate(
-                "Grid Focal Beam", "Grid of rays all directed toward a focal point"
-            ),
+            "ToolTip": translate("Grid Focal Beam", "Grid of rays all directed toward a focal point"),
         }
 
 
-Gui.addCommand("SA_Ray (monochrome)", Ray())
-Gui.addCommand("SA_Ray (sun light)", RaySun())
-Gui.addCommand("SA_Beam", Beam2D())
-Gui.addCommand("SA_2D Radial Beam", RadialBeam2D())
-Gui.addCommand("SA_Spherical Beam", SphericalBeam())
-Gui.addCommand("SA_Start", RedrawAll())
-Gui.addCommand("SA_Off", AllOff())
-Gui.addCommand("SA_Grid Focal Beam", GridToFocalBeam())
+Gui.addCommand("sa_Ray (monochrome)", Ray())
+Gui.addCommand("sa_Ray (sun light)", RaySun())
+Gui.addCommand("sa_Beam", Beam2D())
+Gui.addCommand("sa_2D Radial Beam", RadialBeam2D())
+Gui.addCommand("sa_Spherical Beam", SphericalBeam())
+Gui.addCommand("sa_Start", RedrawAll())
+Gui.addCommand("sa_Off", AllOff())
+Gui.addCommand("sa_Grid Focal Beam", GridToFocalBeam())

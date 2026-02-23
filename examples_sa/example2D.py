@@ -2,34 +2,25 @@ from FreeCAD import Placement, Rotation, Vector
 
 import Sketcher
 import Part
-import FreeCAD as App
+import FreeCAD
 import FreeCADGui as Gui
 import sa_OpticsWorkbench
 import os
-from PySide.QtCore import QT_TRANSLATE_NOOP
+
+# Använd FreeCADs inbyggda translate
+translate = FreeCAD.Qt.translate
 
 _icondir_ = os.path.join(os.path.dirname(__file__), "..")
-_exname_ = QT_TRANSLATE_NOOP("Example2D", "Example - 2D")
 
 
 def createSketch_Sketch_Mirror1(doc):
     Sketch_Mirror1 = doc.addObject("Sketcher::SketchObject", "Sketch_Mirror1")
-    Sketch_Mirror1.addGeometry(
-        Part.LineSegment(
-            Vector(11.836481, 6.837696, 0.0), Vector(15.17516, -0.6152189999999997, 0.0)
-        )
-    )
-    Sketch_Mirror1.addGeometry(
-        Part.Circle(Vector(0.00, -5.56, 0.00), Vector(0.0, 0.0, 1.0), 1.00)
-    )
+    Sketch_Mirror1.addGeometry(Part.LineSegment(Vector(11.836481, 6.837696, 0.0), Vector(15.17516, -0.6152189999999997, 0.0)))
+    Sketch_Mirror1.addGeometry(Part.Circle(Vector(0.00, -5.56, 0.00), Vector(0.0, 0.0, 1.0), 1.00))
     Sketch_Mirror1.toggleConstruction(1)
-    Sketch_Mirror1.addGeometry(
-        Part.Circle(Vector(0.00, -15.18, 0.00), Vector(0.0, 0.0, 1.0), 1.00)
-    )
+    Sketch_Mirror1.addGeometry(Part.Circle(Vector(0.00, -15.18, 0.00), Vector(0.0, 0.0, 1.0), 1.00))
     Sketch_Mirror1.toggleConstruction(2)
-    Sketch_Mirror1.addGeometry(
-        Part.Circle(Vector(7.19, -16.35, 0.00), Vector(0.0, 0.0, 1.0), 1.00)
-    )
+    Sketch_Mirror1.addGeometry(Part.Circle(Vector(7.19, -16.35, 0.00), Vector(0.0, 0.0, 1.0), 1.00))
     Sketch_Mirror1.toggleConstruction(3)
     Sketch_Mirror1.addGeometry(
         Part.BSplineCurve(
@@ -45,21 +36,9 @@ def createSketch_Sketch_Mirror1(doc):
     Sketch_Mirror1.addConstraint(Sketcher.Constraint("Equal", 1, 2))
     Sketch_Mirror1.addConstraint(Sketcher.Constraint("PointOnObject", 2, 3, -2))
     Sketch_Mirror1.addConstraint(Sketcher.Constraint("Equal", 1, 3))
-    Sketch_Mirror1.addConstraint(
-        Sketcher.Constraint(
-            "InternalAlignment:Sketcher::BSplineControlPoint", 1, 3, 4, 0
-        )
-    )
-    Sketch_Mirror1.addConstraint(
-        Sketcher.Constraint(
-            "InternalAlignment:Sketcher::BSplineControlPoint", 2, 3, 4, 1
-        )
-    )
-    Sketch_Mirror1.addConstraint(
-        Sketcher.Constraint(
-            "InternalAlignment:Sketcher::BSplineControlPoint", 3, 3, 4, 2
-        )
-    )
+    Sketch_Mirror1.addConstraint(Sketcher.Constraint("InternalAlignment:Sketcher::BSplineControlPoint", 1, 3, 4, 0))
+    Sketch_Mirror1.addConstraint(Sketcher.Constraint("InternalAlignment:Sketcher::BSplineControlPoint", 2, 3, 4, 1))
+    Sketch_Mirror1.addConstraint(Sketcher.Constraint("InternalAlignment:Sketcher::BSplineControlPoint", 3, 3, 4, 2))
     return Sketch_Mirror1
 
 
@@ -71,16 +50,8 @@ def createSketch_Sketch_Box(doc):
             Vector(40.0, 11.406045000000002, 0.0),
         )
     )
-    Sketch_Box.addGeometry(
-        Part.LineSegment(
-            Vector(40.0, 11.406045000000002, 0.0), Vector(40.0, -21.699192, 0.0)
-        )
-    )
-    Sketch_Box.addGeometry(
-        Part.LineSegment(
-            Vector(40.0, -21.699192, 0.0), Vector(-0.14878900000000073, -21.699192, 0.0)
-        )
-    )
+    Sketch_Box.addGeometry(Part.LineSegment(Vector(40.0, 11.406045000000002, 0.0), Vector(40.0, -21.699192, 0.0)))
+    Sketch_Box.addGeometry(Part.LineSegment(Vector(40.0, -21.699192, 0.0), Vector(-0.14878900000000073, -21.699192, 0.0)))
     Sketch_Box.addGeometry(
         Part.LineSegment(
             Vector(-0.14878900000000073, -21.699192, 0.0),
@@ -168,8 +139,8 @@ def createSketch_Sketch_Prism(doc):
 
 
 def make_optics():
-    App.newDocument()
-    doc = App.activeDocument()
+    FreeCAD.newDocument()
+    doc = FreeCAD.activeDocument()
 
     Sketch_Mirror1 = createSketch_Sketch_Mirror1(doc)
     Sketch_Box1 = createSketch_Sketch_Box(doc)
@@ -181,20 +152,16 @@ def make_optics():
 
     sa_OpticsWorkbench.makeMirror([Sketch_Mirror1, Sketch_Mirror2])
     sa_OpticsWorkbench.makeAbsorber([Sketch_Box1, Sketch_Box2], True)
-    sa_OpticsWorkbench.makeLens(
-        [Sketch_Lens, Sketch_Prism], material="NBK7/Window glass"
-    )
+    sa_OpticsWorkbench.makeLens([Sketch_Lens, Sketch_Prism], material="NBK7/Window glass")
 
     # doc.recompute()
 
     # --- 1) Single ray: X = 75 mm, Pitch = -90° ---
     ray_single = sa_OpticsWorkbench.makeRay(
-        Vector(75.00, 0.00, 0.00),  # start position
-        Vector(0, 0, 1),  # SA forward (+Z)
-        beamNrColumns=1,
-        beamNrRows=1,
+        Vector(75.00, 0.00, 0.00), Vector(0, 0, 1), beamNrColumns=1, beamNrRows=1, maxRayLength=500  # start position  # SA forward (+Z)
     )
-    # Apply exact Placement from your screenshot: X=75, Yaw=0, Pitch=-90, Roll=0
+
+    # Matchar "Euler angles (zyx*)" i Placement-dialogen: Yaw (Z) = 180, Pitch (Y) = 0, Roll (X) = 0
     ray_single.Placement = Placement(Vector(75.0, 0.0, 0.0), Rotation(0.0, -90.0, 0.0))
 
     # --- 2) Beam: 50 columns, Pitch = -90° ---
@@ -204,9 +171,10 @@ def make_optics():
         beamNrColumns=50,
         beamNrRows=1,  # set rows if you need a grid
         beamDistance=0.1,  # or your preferred spacing
+        maxRayLength=500,
     )
     # Rotate the whole beam by Pitch = -90°
-    ray_beam.Placement = Placement(ray_beam.Placement.Base, Rotation(0.0, 90.0, 0.0))
+    ray_beam.Placement = Placement(Vector(0.0, 0.0, 0.0), Rotation(0.0, 90.0, 0.0))
 
     # ray_beam.Placement.Rotation = Rotation(0.0, -90.0, 0.0)
 
@@ -229,7 +197,7 @@ class Example2D:
         return {
             "Pixmap": os.path.join(_icondir_, "optics_workbench_icon.svg"),
             "Accel": "",  # a default shortcut (optional)
-            "MenuText": _exname_,
+            "MenuText": translate("Example2D", "Example - 2D"),
             "ToolTip": "",
         }
 

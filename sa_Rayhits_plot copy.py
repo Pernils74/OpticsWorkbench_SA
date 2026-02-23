@@ -27,7 +27,7 @@ from typing import Dict, List, Tuple, Any, Iterable, Optional
 
 import FreeCAD as App
 import FreeCADGui as Gui
-from PySide2 import QtWidgets
+from PySide import QtWidgets
 
 # --- matplotlib embedding -----------------------------------------------------
 import matplotlib
@@ -98,9 +98,7 @@ def get_sheets(doc) -> List[Any]:
     return [o for o in doc.Objects if o.isDerivedFrom("Spreadsheet::Sheet")]
 
 
-def convex_hull_2d(
-    xs: Iterable[float], ys: Iterable[float]
-) -> List[Tuple[float, float]]:
+def convex_hull_2d(xs: Iterable[float], ys: Iterable[float]) -> List[Tuple[float, float]]:
     """Monotone chain convex hull in 2D."""
     pts = list({(float(x), float(y)) for x, y in zip(xs, ys)})
     if len(pts) <= 1:
@@ -126,9 +124,7 @@ def convex_hull_2d(
     return lower[:-1] + upper[:-1]
 
 
-def smooth_polygon(
-    points: List[Tuple[float, float]], iterations: int = 2
-) -> List[Tuple[float, float]]:
+def smooth_polygon(points: List[Tuple[float, float]], iterations: int = 2) -> List[Tuple[float, float]]:
     """Chaikin-like corner cutting to get a soft shape."""
     pts = points[:]
     for _ in range(iterations):
@@ -145,9 +141,7 @@ def smooth_polygon(
     return pts
 
 
-def point_to_segment_dist(
-    px: float, py: float, x1: float, y1: float, x2: float, y2: float
-) -> float:
+def point_to_segment_dist(px: float, py: float, x1: float, y1: float, x2: float, y2: float) -> float:
     """Min distance between point and line segment."""
     dx, dy = x2 - x1, y2 - y1
     if dx == dy == 0:
@@ -159,9 +153,7 @@ def point_to_segment_dist(
     return math.hypot(px - nx, py - ny)
 
 
-def offset_polygon_adaptive(
-    points: List[Tuple[float, float]], strength: float = 0.35
-) -> List[Tuple[float, float]]:
+def offset_polygon_adaptive(points: List[Tuple[float, float]], strength: float = 0.35) -> List[Tuple[float, float]]:
     """
     Adaptive outward offset based on local edge length.
     Ensures all original hull points remain inside after offset.
@@ -325,11 +317,7 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
         self.spnBlobStrength.setSingleStep(0.01)
         self.spnBlobStrength.setValue(0.15)
         self.spnBlobStrength.setDecimals(3)
-        self.spnBlobStrength.setToolTip(
-            "Controls smooth convex-hull expansion.\n"
-            "Lower = tighter; higher = wider/softer.\n"
-            "Recommended: 0.10–0.25"
-        )
+        self.spnBlobStrength.setToolTip("Controls smooth convex-hull expansion.\n" "Lower = tighter; higher = wider/softer.\n" "Recommended: 0.10–0.25")
         top.addWidget(self.spnBlobStrength)
 
         top.addStretch(1)
@@ -448,9 +436,7 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
 
             # build layout: 2 rows (plot + legends)
             self.fig.clear()
-            gs = gridspec.GridSpec(
-                nrows=2, ncols=1, height_ratios=[12, 2], figure=self.fig
-            )
+            gs = gridspec.GridSpec(nrows=2, ncols=1, height_ratios=[12, 2], figure=self.fig)
 
             cfg = self._gather_config()
             ax = self._build_axes(gs, cfg)
@@ -461,12 +447,7 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
             rays = sorted(tree.keys())
             bounces = sorted({b for r in tree.values() for b in r.keys()})
             prevs = sorted(
-                {
-                    p
-                    for r in tree.values()
-                    for bounce_dict in r.values()
-                    for p in bounce_dict.keys()
-                },
+                {p for r in tree.values() for bounce_dict in r.values() for p in bounce_dict.keys()},
                 key=lambda s: (s is None, str(s)),
             )
 
@@ -543,14 +524,10 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
                     energies = [e[4] for e in entries]
 
                     if cfg.is3d:
-                        sc = ax.scatter(
-                            xs, ys, zs, marker=marker, color=color, s=SCATTER_SIZE
-                        )
+                        sc = ax.scatter(xs, ys, zs, marker=marker, color=color, s=SCATTER_SIZE)
                     else:
                         px, py = (ys, xs) if cfg.flip_2d_axes else (xs, ys)
-                        sc = ax.scatter(
-                            px, py, marker=marker, color=color, s=SCATTER_SIZE
-                        )
+                        sc = ax.scatter(px, py, marker=marker, color=color, s=SCATTER_SIZE)
 
                     # click metadata
                     sc.set_picker(True)
@@ -611,9 +588,7 @@ class RayHitsPlotDialog(QtWidgets.QDialog):
                         continue
 
                     if cfg.smooth_blobs:
-                        hull2 = offset_polygon_adaptive(
-                            hull, strength=cfg.blob_strength
-                        )
+                        hull2 = offset_polygon_adaptive(hull, strength=cfg.blob_strength)
                         poly_pts = smooth_polygon(hull2, iterations=4)
                     else:
                         poly_pts = hull
@@ -779,9 +754,7 @@ def RH_ShowAdvancedPlot():
 class Rayhits_PlotCmd:
     def GetResources(self):
         return {
-            "Pixmap": os.path.join(
-                os.path.dirname(__file__), "icons", "advanced_plot.svg"
-            ),
+            "Pixmap": os.path.join(os.path.dirname(__file__), "icons", "advanced_plot.svg"),
             "MenuText": "RayHits Advanced Plot",
             "ToolTip": "Plot RayHits (click + popup + blobs)",
         }

@@ -1,6 +1,19 @@
 {
-    "editor.formatOnSave": true,
-    "python.analysis.typeCheckingMode": "off",
-    "html.format.wrapLineLength": 180,
-    "editor.wordWrapColumn": 160
+  "editor.formatOnSave": true,
+
+  // Python använder Black-formatteraren (nytt sätt)
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter"
+  },
+
+  // Black: sätt radlängden
+  "black-formatter.args": ["--line-length", "250"],
+
+  // (valfritt) formatera bara ändrade rader vid save
+  // "editor.formatOnSaveMode": "modifications",
+
+  "python.analysis.typeCheckingMode": "off",
+  "html.format.wrapLineLength": 180,
+  "editor.wordWrapColumn": 160,
+  "editor.rulers": [160]
 }

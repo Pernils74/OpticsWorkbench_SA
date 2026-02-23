@@ -31,11 +31,7 @@ class PlotRayHits:
                     if sa_Ray.isOpticalObject(eachObject):
 
                         # Hitta alla HitCoordsFrom-beam-listor på det aktuella objektet
-                        attr_names = [
-                            attr
-                            for attr in dir(eachObject)
-                            if attr.startswith("HitCoordsFrom")
-                        ]
+                        attr_names = [attr for attr in dir(eachObject) if attr.startswith("HitCoordsFrom")]
 
                         for attr in attr_names:
                             coords = getattr(eachObject, attr)
@@ -60,16 +56,10 @@ class PlotRayHits:
                     print("Ignoring:", eachObject.Label)
 
             # ----- Flatten numpy-arrayer -----
-            all_coords = np.array(
-                [coord for coords in coords_per_beam for coord in coords]
-            )
+            all_coords = np.array([coord for coords in coords_per_beam for coord in coords])
             absorber_ids = np.array(absorber_ids)
 
-            all_bounces = (
-                np.array([b for bl in bounce_per_beam for b in bl])
-                if bounce_per_beam
-                else np.array([])
-            )
+            all_bounces = np.array([b for bl in bounce_per_beam for b in bl]) if bounce_per_beam else np.array([])
 
             # ----- Ingen träff hittades -----
             if len(all_coords) == 0:
@@ -145,9 +135,7 @@ class PlotRayHits:
             "Pixmap": os.path.join(_icondir_, "scatter3D.svg"),
             "Accel": "",
             "MenuText": translate("RayHits", "Scatter 3D Plot"),
-            "ToolTip": translate(
-                "RayHits", "Show selected absorber ray hits in a 3D scatter plot"
-            ),
+            "ToolTip": translate("RayHits", "Show selected absorber ray hits in a 3D scatter plot"),
         }
 
 
@@ -178,5 +166,5 @@ class RayHits2CSV:
         }
 
 
-Gui.addCommand("SA_RayHits", PlotRayHits())
-Gui.addCommand("SA_Hits2CSV", RayHits2CSV())
+Gui.addCommand("sa_RayHits", PlotRayHits())
+Gui.addCommand("sa_Hits2CSV", RayHits2CSV())

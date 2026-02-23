@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-
 # sa_OpticalObject.py
-
-# from PySide2.QtCore import translate
-
 
 # __title__ = 'OpticalObject'
 # __author__ = 'Christian Bergmann'
@@ -33,9 +29,7 @@ class OpticalObjectWorker:
         collectStatistics=False,
         transparency=0,
     ):
-        fp.addProperty(
-            "App::PropertyEnumeration", "OpticalType", "OpticalObject", ""
-        ).OpticalType = ["mirror", "absorber"]
+        fp.addProperty("App::PropertyEnumeration", "OpticalType", "OpticalObject", "").OpticalType = ["mirror", "absorber"]
         fp.addProperty(
             "App::PropertyLinkList",
             "Base",
@@ -91,9 +85,7 @@ class LensWorker:
         transparency=100,
     ):
         self.update = False
-        fp.addProperty(
-            "App::PropertyEnumeration", "OpticalType", "Lens", ""
-        ).OpticalType = ["lens"]
+        fp.addProperty("App::PropertyEnumeration", "OpticalType", "Lens", "").OpticalType = ["lens"]
         fp.addProperty(
             "App::PropertyLinkList",
             "Base",
@@ -110,9 +102,7 @@ class LensWorker:
             "App::PropertyFloatList",
             "Sellmeier",
             "Lens",
-            "Sellmeier coefficients. [B1, B2, B3, C1, C2, C3]\n C1, C2, C3 in (nm)².\n"
-            + translate("Lens", "Usually noted in (µm)² in literature,")
-            + "\n (µm)²=10⁶(nm)².",
+            "Sellmeier coefficients. [B1, B2, B3, C1, C2, C3]\n C1, C2, C3 in (nm)².\n" + translate("Lens", "Usually noted in (µm)² in literature,") + "\n (µm)²=10⁶(nm)².",
         )
 
         self.addNewPoperties(fp)
@@ -122,9 +112,7 @@ class LensWorker:
 
         material_names = list(getMaterials())
 
-        fp.addProperty("App::PropertyEnumeration", "Material", "Lens", "").Material = (
-            material_names
-        )
+        fp.addProperty("App::PropertyEnumeration", "Material", "Lens", "").Material = material_names
 
         self.update = True
         fp.Proxy = self
@@ -173,14 +161,10 @@ class LensWorker:
             # sellmeier = self.getMaterials()[fp.Material]
             sellmeier = getMaterials()[fp.Material]
             fp.Sellmeier = sellmeier
-            fp.RefractionIndex = refraction_index_from_sellmeier(
-                wavelength=580, sellmeier=fp.Sellmeier
-            )
+            fp.RefractionIndex = refraction_index_from_sellmeier(wavelength=580, sellmeier=fp.Sellmeier)
 
         if prop == "Sellmeier":
-            fp.RefractionIndex = refraction_index_from_sellmeier(
-                wavelength=580, sellmeier=fp.Sellmeier
-            )
+            fp.RefractionIndex = refraction_index_from_sellmeier(wavelength=580, sellmeier=fp.Sellmeier)
 
         if prop == "RefractionIndex":
             fp.Material = "?"
@@ -205,9 +189,7 @@ class GratingWorker:
         transparency=100,
     ):
         self.update = False
-        fp.addProperty(
-            "App::PropertyEnumeration", "OpticalType", "Grating", ""
-        ).OpticalType = ["grating"]
+        fp.addProperty("App::PropertyEnumeration", "OpticalType", "Grating", "").OpticalType = ["grating"]
         fp.addProperty(
             "App::PropertyLinkList",
             "Base",
@@ -224,9 +206,7 @@ class GratingWorker:
             "App::PropertyFloatList",
             "Sellmeier",
             "Grating",
-            "Sellmeier coefficients. [B1, B2, B3, C1, C2, C3]\n C1, C2, C3 in (nm)².\n"
-            + translate("Grating", "Usually noted in (µm)² in literature,")
-            + "\n (µm)²=10⁶(nm)².",
+            "Sellmeier coefficients. [B1, B2, B3, C1, C2, C3]\n C1, C2, C3 in (nm)².\n" + translate("Grating", "Usually noted in (µm)² in literature,") + "\n (µm)²=10⁶(nm)².",
         )
         fp.addProperty(
             "App::PropertyFloat",
@@ -273,9 +253,7 @@ class GratingWorker:
 
         material_names = list(getMaterials())
 
-        fp.addProperty(
-            "App::PropertyEnumeration", "Material", "Grating", ""
-        ).Material = material_names
+        fp.addProperty("App::PropertyEnumeration", "Material", "Grating", "").Material = material_names
         self.addNewPoperties(fp)
         fp.Transparency = transparency
         fp.collectStatistics = collectStatistics
@@ -326,14 +304,10 @@ class GratingWorker:
         if prop == "Material":
             sellmeier = getMaterials()[fp.Material]
             fp.Sellmeier = sellmeier
-            fp.RefractionIndex = refraction_index_from_sellmeier(
-                wavelength=580, sellmeier=fp.Sellmeier
-            )
+            fp.RefractionIndex = refraction_index_from_sellmeier(wavelength=580, sellmeier=fp.Sellmeier)
 
         if prop == "Sellmeier":
-            fp.RefractionIndex = refraction_index_from_sellmeier(
-                wavelength=580, sellmeier=fp.Sellmeier
-            )
+            fp.RefractionIndex = refraction_index_from_sellmeier(wavelength=580, sellmeier=fp.Sellmeier)
 
         if prop == "RefractionIndex":
             fp.Material = "?"
@@ -356,9 +330,7 @@ class OpticalObjectViewProvider:
         if self.Object.OpticalType == "absorber":
             return os.path.join(_icondir_, "absorber.svg")
 
-        if (
-            self.Object.OpticalType == "grating"
-        ):  # this paragraph was provided by OpenAI chatgpt at feb.01.2023
+        if self.Object.OpticalType == "grating":  # this paragraph was provided by OpenAI chatgpt at feb.01.2023
             return os.path.join(_icondir_, "grating.svg")
 
         if self.Object.OpticalType == "emitter":
@@ -511,9 +483,7 @@ def getMaterials():
 def refraction_index_from_sellmeier(wavelength, sellmeier):
     b1, b2, b3, c1, c2, c3 = sellmeier
     l = wavelength
-    n = math.sqrt(
-        1 + b1 * l**2 / (l**2 - c1) + b2 * l**2 / (l**2 - c2) + b3 * l**2 / (l**2 - c3)
-    )
+    n = math.sqrt(1 + b1 * l**2 / (l**2 - c1) + b2 * l**2 / (l**2 - c2) + b3 * l**2 / (l**2 - c3))
     return n
 
 
@@ -525,10 +495,7 @@ class OpticalMirror:
         Gui.doCommand("import sa_OpticsWorkbench")
         Gui.doCommand("objects = []")
         for sel in selection:
-            Gui.doCommand(
-                'objects.append(FreeCAD.ActiveDocument.getObject("%s"))'
-                % (sel.ObjectName)
-            )
+            Gui.doCommand('objects.append(FreeCAD.ActiveDocument.getObject("%s"))' % (sel.ObjectName))
 
         Gui.doCommand("sa_OpticsWorkbench.makeMirror(objects)")
 
@@ -546,9 +513,7 @@ class OpticalMirror:
             "Pixmap": os.path.join(_icondir_, "mirror.svg"),
             "Accel": "",  # a default shortcut (optional)
             "MenuText": translate("Mirror", "Optical Mirror"),
-            "ToolTip": translate(
-                "Mirror", "Declare your FreeCAD objects to be optical mirrors"
-            ),
+            "ToolTip": translate("Mirror", "Declare your FreeCAD objects to be optical mirrors"),
         }
 
 
@@ -560,10 +525,7 @@ class OpticalAbsorber:
         Gui.doCommand("import sa_OpticsWorkbench")
         Gui.doCommand("objects = []")
         for sel in selection:
-            Gui.doCommand(
-                'objects.append(FreeCAD.ActiveDocument.getObject("%s"))'
-                % (sel.ObjectName)
-            )
+            Gui.doCommand('objects.append(FreeCAD.ActiveDocument.getObject("%s"))' % (sel.ObjectName))
 
         Gui.doCommand("sa_OpticsWorkbench.makeAbsorber(objects)")
 
@@ -581,9 +543,7 @@ class OpticalAbsorber:
             "Pixmap": os.path.join(_icondir_, "absorber.svg"),
             "Accel": "",  # a default shortcut (optional)
             "MenuText": translate("Absorber", "Optical Absorber"),
-            "ToolTip": translate(
-                "Absorber", "Declare your FreeCAD objects to be optical absorbers"
-            ),
+            "ToolTip": translate("Absorber", "Declare your FreeCAD objects to be optical absorbers"),
         }
 
 
@@ -595,10 +555,7 @@ class OpticalLens:
         Gui.doCommand("import sa_OpticsWorkbench")
         Gui.doCommand("objects = []")
         for sel in selection:
-            Gui.doCommand(
-                'objects.append(FreeCAD.ActiveDocument.getObject("%s"))'
-                % (sel.ObjectName)
-            )
+            Gui.doCommand('objects.append(FreeCAD.ActiveDocument.getObject("%s"))' % (sel.ObjectName))
 
         Gui.doCommand('sa_OpticsWorkbench.makeLens(objects, material="Quartz")')
 
@@ -616,9 +573,7 @@ class OpticalLens:
             "Pixmap": os.path.join(_icondir_, "lens.svg"),
             "Accel": "",  # a default shortcut (optional)
             "MenuText": translate("Lens", "Optical Lens"),
-            "ToolTip": translate(
-                "Lens", "Declare your FreeCAD objects to be optical lenses"
-            ),
+            "ToolTip": translate("Lens", "Declare your FreeCAD objects to be optical lenses"),
         }
 
 
@@ -630,10 +585,7 @@ class OpticalGrating:
         Gui.doCommand("import sa_OpticsWorkbench")
         Gui.doCommand("objects = []")
         for sel in selection:
-            Gui.doCommand(
-                'objects.append(FreeCAD.ActiveDocument.getObject("%s"))'
-                % (sel.ObjectName)
-            )
+            Gui.doCommand('objects.append(FreeCAD.ActiveDocument.getObject("%s"))' % (sel.ObjectName))
 
         Gui.doCommand("sa_OpticsWorkbench.makeGrating(objects)")
 
@@ -651,9 +603,7 @@ class OpticalGrating:
             "Pixmap": os.path.join(_icondir_, "grating.svg"),
             "Accel": "",  # a default shortcut (optional)
             "MenuText": translate("Grating", "Diffraction grating"),
-            "ToolTip": translate(
-                "Grating", "Declare your FreeCAD objects to be diffraction gratings"
-            ),
+            "ToolTip": translate("Grating", "Declare your FreeCAD objects to be diffraction gratings"),
         }
 
 
@@ -664,10 +614,7 @@ class OpticalEmitter:
         selection = Gui.Selection.getSelectionEx()
         Gui.doCommand("import sa_OpticsWorkbench")
         if len(selection) > 0:
-            Gui.doCommand(
-                'obj = FreeCAD.ActiveDocument.getObject("%s")'
-                % (selection[0].ObjectName)
-            )
+            Gui.doCommand('obj = FreeCAD.ActiveDocument.getObject("%s")' % (selection[0].ObjectName))
             faces = []
             for sub in selection[0].SubElementNames:
                 faces.append(sub)
@@ -688,14 +635,12 @@ class OpticalEmitter:
             "Pixmap": os.path.join(_icondir_, "emitter.svg"),
             "Accel": "",  # a default shortcut (optional)
             "MenuText": translate("Emitter", "Optical Emitter"),
-            "ToolTip": translate(
-                "Emitter", "Declare your FreeCAD objects to be optical emitters"
-            ),
+            "ToolTip": translate("Emitter", "Declare your FreeCAD objects to be optical emitters"),
         }
 
 
-Gui.addCommand("SA_Emitter", OpticalEmitter())
-Gui.addCommand("SA_Mirror", OpticalMirror())
-Gui.addCommand("SA_Absorber", OpticalAbsorber())
-Gui.addCommand("SA_Lens", OpticalLens())
-Gui.addCommand("SA_Grating", OpticalGrating())
+Gui.addCommand("sa_Emitter", OpticalEmitter())
+Gui.addCommand("sa_Mirror", OpticalMirror())
+Gui.addCommand("sa_Absorber", OpticalAbsorber())
+Gui.addCommand("sa_Lens", OpticalLens())
+Gui.addCommand("sa_Grating", OpticalGrating())
