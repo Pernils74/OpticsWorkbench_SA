@@ -12,7 +12,7 @@ import sa_OpticalObject
 import SunRay
 from numpy import linspace
 from importlib import reload
-import rayhits_plot
+import sa_Plot
 
 
 # Global workbench ID for tagging created objects
@@ -375,7 +375,7 @@ def plot_xy(absorber):
 
 def drawPlot(selectedObjList):
     ## Create the list of selected absorbers; if none then skip
-    rayhits_plot.PlotRayHits.plot3D(selectedObjList)
+    sa_Plot.PlotRayHits.plot3D(selectedObjList)
 
 
 def Hits2CSV(sheet_name=None, setFocus=True):

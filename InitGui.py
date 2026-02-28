@@ -32,9 +32,10 @@ class OpticsWorkbench_SA(Workbench):
         import sa_Ray
         import sa_Plot
         import sa_OpticalObject
-        import rayhits_plot
+        # import rayhits_plot
         import sa_LiveSheets
-        import rayhits_plot.sa_Rayhits_plot
+        # import rayhits_plot.sa_Rayhits_plot
+        from rayhits_plot import sa_Rayhits_plot
 
         # Import new dock command so it registers the FreeCADGui command
         import sa_Dock as DockCmd
